@@ -7,18 +7,16 @@ Family-shared shopping lists and supermarket price comparison.
 - Frontend: React 19, TypeScript, Vite
 - Backend: Node.js, Express 5, TypeScript
 - Database: PostgreSQL
-- ORM: Prisma 7 with PostgreSQL driver adapter
+- ORM: Prisma 7 with the PostgreSQL driver adapter
 
-The folder layout and backend conventions follow the Inventory application.
-
-## Structure
+## Project structure
 
 - `frontend/`: React application
-- `backend/`: Express API and Prisma schema
+- `backend/`: Express API, Prisma schema, and migrations
 
 ## Database
 
-ShoppingMarket uses a local PostgreSQL server.
+ShoppingMarket uses your existing local PostgreSQL server.
 
 | Setting | Value |
 |---|---|
@@ -27,20 +25,46 @@ ShoppingMarket uses a local PostgreSQL server.
 | Database | shopping_market |
 | Owner / User | robertsanchez |
 
-The database has already been created. Prisma migrations will manage its tables and schema.
+The database is expected to exist already. The first Prisma migration will create the application tables; it will not create or drop the database itself.
 
-Configure `backend/.env` using `backend/.env.example`. Replace the placeholder in `DATABASE_URL` with the password for the local PostgreSQL user `robertsanchez`.
+Configure `backend/.env` using `backend/.env.example`. Replace the password placeholder in `DATABASE_URL` with the password for your local PostgreSQL user `robertsanchez`. URL-encode special characters in the password. Never commit `.env` files or credentials.
 
-URL-encode special characters in the password if necessary.
+## Install dependencies
 
-Never commit `.env` files or database credentials.
+```bash
+cd backend
+npm install
+npm run db:generate
+```
 
-## Run
+In another terminal:
 
-Backend: `cd backend && npm run dev`
+```bash
+cd frontend
+npm install
+```
 
-Frontend: `cd frontend && npm run dev`
+## Run locally
 
-API health: http://localhost:5002/api/health
+Start the API with `cd backend && npm run dev` and the frontend with `cd frontend && npm run dev`.
 
-Frontend: http://localhost:5173
+- Frontend: http://localhost:5173
+- API root: http://localhost:5002
+- API health (including PostgreSQL connectivity): http://localhost:5002/api/health
+
+## Database migrations
+
+After installing backend dependencies and generating Prisma Client, create and apply the initial migration:
+
+```bash
+cd backend
+npm run db:migrate -- --name init
+```
+
+For an environment where migrations already exist, use `npm run db:deploy`.
+
+**Important:** Do not run a reset command against your existing database. Review the migration prompt and stop if Prisma proposes resetting the database.
+
+## Build checks
+
+Run `npm run typecheck` and `npm run build` in each of the `backend/` and `frontend/` directories.
