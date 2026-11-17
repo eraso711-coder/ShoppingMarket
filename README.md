@@ -48,9 +48,9 @@ npm install
 
 Start the API with `cd backend && npm run dev` and the frontend with `cd frontend && npm run dev`.
 
-- Frontend: http://localhost:5173
-- API root: http://localhost:5002
-- API health (including PostgreSQL connectivity): http://localhost:5002/api/health
+- Frontend: http://localhost:5175
+- API root: http://localhost:5005
+- API health (including PostgreSQL connectivity): http://localhost:5005/api/health
 
 ## Database migrations
 
