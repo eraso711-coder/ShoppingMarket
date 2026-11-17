@@ -1,0 +1,11 @@
+import cors from "cors";
+import express from "express";
+import healthRoutes from "./routes/health.routes.js";
+import { errorHandler } from "./middleware/error.middleware.js";
+const app=express();
+app.use(cors({origin:process.env.FRONTEND_URL??"http://localhost:5173"}));
+app.use(express.json());
+app.get("/",(_request,response)=>response.json({name:"ShoppingMarket API",status:"running"}));
+app.use("/api/health",healthRoutes);
+app.use(errorHandler);
+export default app;
