@@ -5,8 +5,7 @@ datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
 }
-enum FamilyRole { OWNER ADMIN MEMBER }
-enum ShoppingListStatus { DRAFT ACTIVE COMPLETED ARCHIVED }
+enum FamilyRole {\n  OWNER\n  ADMIN\n  MEMBER\n}\n\nenum ShoppingListStatus {\n  DRAFT\n  ACTIVE\n  COMPLETED\n  ARCHIVED\n}
 
 model User {
   id String @id @default(uuid()) @db.Uuid
