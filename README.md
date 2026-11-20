@@ -107,3 +107,33 @@ All shopping-list endpoints require `Authorization: Bearer <token>`. The API che
 List statuses are `ACTIVE`, `COMPLETED`, and `ARCHIVED`. Item statuses are `TO_BUY`, `IN_CART`, `PURCHASED`, and `UNAVAILABLE`. Quantities must be positive and support up to three decimal places.
 
 The shopping-list models and relations were already part of the initial Prisma schema, so this feature does not require a new database migration.
+
+
+## Product catalogue and supermarket prices
+
+The authenticated catalogue workspace lets household members:
+
+- Search products by name, brand, or barcode.
+- Create shared catalogue products with an optional brand, category, and unit.
+- Browse product categories and create categories through the API.
+- Maintain a supermarket directory, including optional chain and website details.
+- Record manual price observations in EUR (or another three-letter currency code).
+- Compare the latest recorded price for each supermarket.
+- Add a catalogue product directly to the currently selected shopping list.
+
+Catalogue API endpoints (all require a bearer token):
+
+| Method | Endpoint | Purpose |
+|---|---|---|
+| GET | `/api/catalog/categories` | List categories |
+| POST | `/api/catalog/categories` | Create a category (`name`, optional `parentId`) |
+| GET | `/api/catalog/supermarkets` | List supermarkets |
+| POST | `/api/catalog/supermarkets` | Add a supermarket (`name`, optional `chain`, `website`) |
+| GET | `/api/catalog/products?q=milk` | Search products |
+| POST | `/api/catalog/products` | Create a product |
+| GET | `/api/catalog/products/:productId/prices` | Get the latest observation per supermarket |
+| POST | `/api/catalog/products/:productId/prices` | Record a price observation (`supermarketId`, `price`, optional `currency`, `source`) |
+
+Prices are observations, not overwritten values: each submission is timestamped so the application can build price history over time. Recording a price also creates or reactivates the product's supermarket offer.
+
+This milestone reuses the existing `Category`, `Product`, `Supermarket`, `SupermarketProduct`, and `PriceObservation` tables. No schema migration is required. Price collection is manual at this stage; automated retailer integrations will need to be designed separately for each retailer and its data-access terms.
