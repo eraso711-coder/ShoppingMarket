@@ -1,6 +1,6 @@
 import { useEffect, useState, type FormEvent } from "react";
 
-const API_URL = import.meta.env.VITE_API_URL ?? "http://localhost:5005/api";
+const API_URL = "http://localhost:5005/api";
 
 type User = { id: string; email: string; firstName: string; lastName: string };
 type Family = { id: string; name: string; role: string } | null;
