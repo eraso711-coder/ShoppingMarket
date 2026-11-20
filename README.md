@@ -52,6 +52,12 @@ Start the API with `cd backend && npm run dev` and the frontend with `cd fronten
 - API root: http://localhost:5005
 - API health (including PostgreSQL connectivity): http://localhost:5005/api/health
 
+## Accounts and authentication
+
+The first application flow supports account registration and sign-in. Registration creates a user and a family, and assigns the new user the `OWNER` role. Passwords are hashed with bcrypt; API sessions use signed JWT bearer tokens. Configure `JWT_SECRET` with a random value of at least 32 characters in `backend/.env` before starting the API. Never commit this secret.
+
+The frontend stores the session token in browser local storage for this initial version. For a production deployment, review the session-storage approach, add rate limiting and email verification, and configure HTTPS.
+
 ## Database migrations
 
 After installing backend dependencies and generating Prisma Client, create and apply the initial migration:
