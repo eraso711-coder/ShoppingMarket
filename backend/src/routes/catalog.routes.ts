@@ -122,15 +122,27 @@ router.get("/products", async (request, response, next) => {
       orderBy: [{ name: "asc" }, { brand: "asc" }],
       include: {
         category: { select: { id: true, name: true } },
-        priceObservations: {
-          take: 10,
-          orderBy: { observedAt: "desc" },
-          include: { supermarket: { select: { id: true, name: true, chain: true } } }
-        },
         _count: { select: { supermarketOffers: true, listItems: true } }
       }
     });
-    response.json({ products });
+    const observations = products.length ? await prisma.priceObservation.findMany({
+      where: { productId: { in: products.map((product) => product.id) } },
+      orderBy: { observedAt: "desc" },
+      include: { supermarket: { select: { id: true, name: true, chain: true } } }
+    }) : [];
+    const seen = new Set<string>();
+    const latestPrices = observations.filter((observation) => {
+      const key = observation.supermarketId + ":" + observation.productId;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+    response.json({
+      products: products.map((product) => ({
+        ...product,
+        priceObservations: latestPrices.filter((observation) => observation.productId === product.id)
+      }))
+    });
   } catch (error) {
     next(error);
   }
