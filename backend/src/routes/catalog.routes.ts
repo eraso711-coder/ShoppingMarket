@@ -159,13 +159,13 @@ router.post("/products", async (request, response, next) => {
   try {
     userId(response);
     const { name, brand, barcode, description, categoryId, unit, quantity } = request.body ?? {};
-    if (!textField(name, 150) ||
+    if (!textField(name, 150) || !textField(categoryId, 64) ||
         (brand !== undefined && brand !== null && (typeof brand !== "string" || brand.trim().length > 100)) ||
         (barcode !== undefined && barcode !== null && (typeof barcode !== "string" || barcode.trim().length > 64)) ||
         (description !== undefined && description !== null && (typeof description !== "string" || description.length > 1000)) ||
         (categoryId !== undefined && categoryId !== null && typeof categoryId !== "string") ||
         (unit !== undefined && unit !== null && (typeof unit !== "string" || unit.trim().length > 30))) {
-      response.status(400).json({ error: "Check the product name and optional product details." });
+      response.status(400).json({ error: "A product name and category are required. Check the other optional product details too." });
       return;
     }
     let parsedQuantity: Prisma.Decimal | null = null;
@@ -178,7 +178,7 @@ router.post("/products", async (request, response, next) => {
       }
       parsedQuantity = new Prisma.Decimal(numericQuantity);
     }
-    if (typeof categoryId === "string" && categoryId) {
+    {
       const category = await prisma.category.findUnique({ where: { id: categoryId }, select: { id: true } });
       if (!category) {
         response.status(404).json({ error: "Category not found." });
@@ -191,7 +191,7 @@ router.post("/products", async (request, response, next) => {
         brand: typeof brand === "string" && brand.trim() ? brand.trim() : null,
         barcode: typeof barcode === "string" && barcode.trim() ? barcode.trim() : null,
         description: typeof description === "string" && description.trim() ? description.trim() : null,
-        categoryId: typeof categoryId === "string" && categoryId ? categoryId : null,
+        categoryId,
         unit: typeof unit === "string" && unit.trim() ? unit.trim() : null,
         quantity: parsedQuantity
       },
