@@ -80,3 +80,30 @@ For an environment where migrations already exist, use `npm run db:deploy`.
 ## Build checks
 
 Run `npm run typecheck` and `npm run build` in each of the `backend/` and `frontend/` directories.
+
+
+## Family shopping lists
+
+The first shopping-list workflow is available after signing in:
+
+- Create shopping lists for your family.
+- View lists and their items, filter active and completed lists, and see remaining-item counts.
+- Add custom items with a quantity and optional note.
+- Edit an item's name, quantity, and note; remove items when they are no longer needed.
+- Mark items as purchased or move them back to the to-buy state.
+- Complete a list and reopen it later.
+
+All shopping-list endpoints require `Authorization: Bearer <token>`. The API checks the signed-in user's family membership before returning or changing a list, and checks that an item belongs to the requested list before updating or deleting it.
+
+| Method | Endpoint | Purpose |
+|---|---|---|
+| GET | `/api/shopping-lists` | List all shopping lists for the user's families, including their items |
+| POST | `/api/shopping-lists` | Create a list (`name`, `familyId`, optional `dueAt`) |
+| PATCH | `/api/shopping-lists/:listId` | Rename a list, set its due date, or change status |
+| POST | `/api/shopping-lists/:listId/items` | Add an item (`name` or `productId`, optional `quantity` and `notes`) |
+| PATCH | `/api/shopping-lists/:listId/items/:itemId` | Edit item name, quantity, notes, or status |
+| DELETE | `/api/shopping-lists/:listId/items/:itemId` | Remove an item |
+
+List statuses are `ACTIVE`, `COMPLETED`, and `ARCHIVED`. Item statuses are `TO_BUY`, `IN_CART`, `PURCHASED`, and `UNAVAILABLE`. Quantities must be positive and support up to three decimal places.
+
+The shopping-list models and relations were already part of the initial Prisma schema, so this feature does not require a new database migration.
