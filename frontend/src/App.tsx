@@ -47,11 +47,13 @@ async function apiRequest<T>(path: string, token: string, options: RequestInit =
 function ShoppingItemRow({
   item,
   token,
+  listId,
   onChanged,
   onError
 }: {
   item: Item;
   token: string;
+  listId: string;
   onChanged: () => void;
   onError: (message: string) => void;
 }) {
@@ -69,7 +71,7 @@ function ShoppingItemRow({
     setSaving(true);
     onError("");
     try {
-      await apiRequest(`/shopping-lists/${itemListId}/items/${item.id}`, token, {
+      await apiRequest(`/shopping-lists/${listId}/items/${item.id}`, token, {
         method: "PATCH",
         body: JSON.stringify({ name, quantity: Number(quantity), notes })
       });
@@ -126,9 +128,6 @@ function ShoppingItemRow({
     </article>
   );
 }
-
-// The list id is supplied by the active list context before each row is rendered.
-let itemListId = "";
 
 function App() {
   const [mode, setMode] = useState<"register" | "login">("register");
@@ -320,8 +319,7 @@ function App() {
               <div className="progress-track"><span style={{ width: `${selectedList.items.length ? selectedList.items.filter((item) => item.status === "PURCHASED").length / selectedList.items.length * 100 : 0}%` }} /></div>
               {selectedList.items.length > 0 ? <div className="items-list">
                 {selectedList.items.map((item) => {
-                  itemListId = selectedList.id;
-                  return <ShoppingItemRow key={item.id} item={item} token={token} onChanged={() => refreshLists(token)} onError={setError} />;
+                  return <ShoppingItemRow key={item.id} item={item} token={token} listId={selectedList.id} onChanged={() => refreshLists(token)} onError={setError} />;
                 })}
               </div> : <div className="empty-items"><div className="empty-illustration">＋</div><h3>Your list is ready</h3><p>Add your first item below and it will appear here.</p></div>}
               {selectedList.status !== "ARCHIVED" && <form className="add-item-form" onSubmit={addItem}>
