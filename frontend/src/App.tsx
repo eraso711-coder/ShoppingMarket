@@ -147,6 +147,8 @@ function App() {
   const [catalogQuery, setCatalogQuery] = useState("");
   const [catalogProducts, setCatalogProducts] = useState<CatalogProduct[]>([]);
   const [catalogCategories, setCatalogCategories] = useState<CatalogCategory[]>([]);
+  const [categoryName, setCategoryName] = useState("");
+  const [creatingCategory, setCreatingCategory] = useState(false);
   const [supermarkets, setSupermarkets] = useState<Supermarket[]>([]);
   const [catalogLoading, setCatalogLoading] = useState(false);
   const [catalogError, setCatalogError] = useState("");
@@ -333,6 +335,24 @@ function App() {
     } finally { setCreatingProduct(false); }
   }
 
+  async function createCategory(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!token) return;
+    setCreatingCategory(true);
+    setCatalogError("");
+    try {
+      const data = await apiRequest<{ category: CatalogCategory }>("/catalog/categories", token, {
+        method: "POST",
+        body: JSON.stringify({ name: categoryName })
+      });
+      setCatalogCategories((current) => [...current, data.category].sort((a, b) => a.name.localeCompare(b.name)));
+      setProductCategoryId(data.category.id);
+      setCategoryName("");
+    } catch (requestError) {
+      setCatalogError(requestError instanceof Error ? requestError.message : "Unable to create the category.");
+    } finally { setCreatingCategory(false); }
+  }
+
   async function createSupermarket(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!token) return;
@@ -454,6 +474,12 @@ function App() {
               <input value={productName} onChange={(event) => setProductName(event.target.value)} placeholder="Product name" maxLength={150} required />
               <div className="catalog-form-row"><input value={productBrand} onChange={(event) => setProductBrand(event.target.value)} placeholder="Brand (optional)" maxLength={100} /><select value={productCategoryId} onChange={(event) => setProductCategoryId(event.target.value)}><option value="">Choose category</option>{catalogCategories.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}</select></div>
               <div className="catalog-form-row"><input value={productUnit} onChange={(event) => setProductUnit(event.target.value)} placeholder="Unit, e.g. 1 L or 500 g" maxLength={30} /><button className="primary-action" type="submit" disabled={creatingProduct || !productName.trim()}>{creatingProduct ? "Saving…" : "Add product"}</button></div>
+            </form>
+            <form className="catalog-create-form" onSubmit={createCategory}>
+              <div className="catalog-form-title"><span className="preview-kicker">ORGANISE PRODUCTS</span><strong>Categories</strong></div>
+              <input value={categoryName} onChange={(event) => setCategoryName(event.target.value)} placeholder="e.g. Dairy, Bakery" maxLength={80} required />
+              <button className="secondary-action" type="submit" disabled={creatingCategory || !categoryName.trim()}>{creatingCategory ? "Saving…" : "Add category"}</button>
+              <p>{catalogCategories.length} categor{catalogCategories.length === 1 ? "y" : "ies"} available</p>
             </form>
             <form className="catalog-create-form supermarket-form" onSubmit={createSupermarket}>
               <div className="catalog-form-title"><span className="preview-kicker">PRICE SOURCES</span><strong>Supermarkets</strong></div>
