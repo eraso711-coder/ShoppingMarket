@@ -326,7 +326,8 @@ function App() {
         body: JSON.stringify({ name: productName, brand: productBrand || null, categoryId: productCategoryId || null, unit: productUnit || null })
       });
       setProductName(""); setProductBrand(""); setProductCategoryId(""); setProductUnit("");
-      setCatalogQuery("");
+      const refreshed = await apiRequest<{ products: CatalogProduct[] }>(`/catalog/products?q=${encodeURIComponent(catalogQuery)}`, token);
+      setCatalogProducts(refreshed.products);
     } catch (requestError) {
       setCatalogError(requestError instanceof Error ? requestError.message : "Unable to create the product.");
     } finally { setCreatingProduct(false); }
@@ -361,7 +362,6 @@ function App() {
         body: JSON.stringify({ supermarketId: priceSupermarketId, price: Number(priceValue), currency: "EUR", source: "manual-entry" })
       });
       setPriceProductId(null); setPriceValue("");
-      setCatalogQuery((current) => current);
       const data = await apiRequest<{ products: CatalogProduct[] }>(`/catalog/products?q=${encodeURIComponent(catalogQuery)}`, token);
       setCatalogProducts(data.products);
     } catch (requestError) {
