@@ -47,6 +47,13 @@ router.post("/categories", async (request, response, next) => {
       response.status(400).json({ error: "Invalid parent category." });
       return;
     }
+    if (typeof parentId === "string" && parentId) {
+      const parent = await prisma.category.findUnique({ where: { id: parentId }, select: { id: true } });
+      if (!parent) {
+        response.status(404).json({ error: "Parent category not found." });
+        return;
+      }
+    }
     const category = await prisma.category.create({
       data: { name: name.trim(), parentId: parentId || null }
     });
@@ -170,6 +177,13 @@ router.post("/products", async (request, response, next) => {
         return;
       }
       parsedQuantity = new Prisma.Decimal(numericQuantity);
+    }
+    if (typeof categoryId === "string" && categoryId) {
+      const category = await prisma.category.findUnique({ where: { id: categoryId }, select: { id: true } });
+      if (!category) {
+        response.status(404).json({ error: "Category not found." });
+        return;
+      }
     }
     const product = await prisma.product.create({
       data: {
