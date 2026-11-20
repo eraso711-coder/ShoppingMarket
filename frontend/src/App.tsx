@@ -87,7 +87,7 @@ function ShoppingItemRow({
   async function togglePurchased() {
     onError("");
     try {
-      await apiRequest(`/shopping-lists/${itemListId}/items/${item.id}`, token, {
+      await apiRequest(`/shopping-lists/${listId}/items/${item.id}`, token, {
         method: "PATCH",
         body: JSON.stringify({ status: purchased ? "TO_BUY" : "PURCHASED" })
       });
@@ -101,7 +101,7 @@ function ShoppingItemRow({
     setRemoving(true);
     onError("");
     try {
-      await apiRequest(`/shopping-lists/${itemListId}/items/${item.id}`, token, { method: "DELETE" });
+      await apiRequest(`/shopping-lists/${listId}/items/${item.id}`, token, { method: "DELETE" });
       onChanged();
     } catch (error) {
       onError(error instanceof Error ? error.message : "Unable to remove this item.");
