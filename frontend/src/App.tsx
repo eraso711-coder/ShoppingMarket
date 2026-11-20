@@ -467,19 +467,26 @@ function App() {
         {activeView === "catalog" && <section className="catalog-workspace">
           <div className="catalog-heading"><div><span className="eyebrow">PRODUCTS & PRICES</span><h2>Product catalogue</h2><p>Build a shared catalogue and record prices from the supermarkets you use.</p></div><span className="catalog-total">{catalogProducts.length} products</span></div>
           {catalogError && <div className="global-error" role="alert">{catalogError}<button onClick={() => setCatalogError("")}>×</button></div>}
+          <section className="category-manager" aria-labelledby="category-manager-title">
+            <div className="category-manager-heading"><div><span className="preview-kicker">STEP 1 · ORGANISE YOUR CATALOGUE</span><h3 id="category-manager-title">Product categories</h3><p>Create your categories first. Every catalogue product must belong to one.</p></div><span className="category-count">{catalogCategories.length} {catalogCategories.length === 1 ? "category" : "categories"}</span></div>
+            <form className="category-create-form" onSubmit={createCategory}>
+              <label className="sr-only" htmlFor="new-category-name">New category name</label>
+              <input id="new-category-name" value={categoryName} onChange={(event) => setCategoryName(event.target.value)} placeholder="Enter a category name, e.g. Dairy" maxLength={80} required />
+              <button className="primary-action" type="submit" disabled={creatingCategory || !categoryName.trim()}>{creatingCategory ? "Creating…" : "＋ Add category"}</button>
+            </form>
+            <div className="category-list" aria-live="polite">
+              {catalogCategories.length ? catalogCategories.map((category) => <span className={productCategoryId === category.id ? "category-chip selected" : "category-chip"} key={category.id}>{category.name}{productCategoryId === category.id ? " ✓" : ""}</span>) : <p className="category-empty">No categories yet. Add your first category above to get started.</p>}
+            </div>
+          </section>
           <div className="catalog-tools">
             <form className="catalog-search" onSubmit={(event) => event.preventDefault()}><input value={catalogQuery} onChange={(event) => setCatalogQuery(event.target.value)} placeholder="Search by product, brand or barcode…" /><span>⌕</span></form>
             <form className="catalog-create-form" onSubmit={createCatalogProduct}>
               <div className="catalog-form-title"><span className="preview-kicker">ADD TO CATALOGUE</span><strong>New product</strong></div>
               <input value={productName} onChange={(event) => setProductName(event.target.value)} placeholder="Product name" maxLength={150} required />
-              <div className="catalog-form-row"><input value={productBrand} onChange={(event) => setProductBrand(event.target.value)} placeholder="Brand (optional)" maxLength={100} /><select value={productCategoryId} onChange={(event) => setProductCategoryId(event.target.value)}><option value="">Choose category</option>{catalogCategories.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}</select></div>
-              <div className="catalog-form-row"><input value={productUnit} onChange={(event) => setProductUnit(event.target.value)} placeholder="Unit, e.g. 1 L or 500 g" maxLength={30} /><button className="primary-action" type="submit" disabled={creatingProduct || !productName.trim()}>{creatingProduct ? "Saving…" : "Add product"}</button></div>
-            </form>
-            <form className="catalog-create-form" onSubmit={createCategory}>
-              <div className="catalog-form-title"><span className="preview-kicker">ORGANISE PRODUCTS</span><strong>Categories</strong></div>
-              <input value={categoryName} onChange={(event) => setCategoryName(event.target.value)} placeholder="e.g. Dairy, Bakery" maxLength={80} required />
-              <button className="secondary-action" type="submit" disabled={creatingCategory || !categoryName.trim()}>{creatingCategory ? "Saving…" : "Add category"}</button>
-              <p>{catalogCategories.length} categor{catalogCategories.length === 1 ? "y" : "ies"} available</p>
+              <input value={productBrand} onChange={(event) => setProductBrand(event.target.value)} placeholder="Brand (optional)" maxLength={100} />
+              <select value={productCategoryId} onChange={(event) => setProductCategoryId(event.target.value)} required disabled={catalogCategories.length === 0}><option value="">Choose a category *</option>{catalogCategories.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}</select>
+              <div className="catalog-form-row"><input value={productUnit} onChange={(event) => setProductUnit(event.target.value)} placeholder="Unit, e.g. 1 L or 500 g" maxLength={30} /><button className="primary-action" type="submit" disabled={creatingProduct || !productName.trim() || !productCategoryId}>{creatingProduct ? "Saving…" : "Add product"}</button></div>
+              {catalogCategories.length === 0 && <p className="catalog-form-hint">Create your first category above before adding products.</p>}
             </form>
             <form className="catalog-create-form supermarket-form" onSubmit={createSupermarket}>
               <div className="catalog-form-title"><span className="preview-kicker">PRICE SOURCES</span><strong>Supermarkets</strong></div>
