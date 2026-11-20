@@ -395,6 +395,7 @@ function App() {
       <main className="app-shell">
         <header className="topbar">
           <a className="brand" href="/"><span className="brand-mark">S</span><span>ShoppingMarket</span></a>
+          <nav className="main-nav"><button className={activeView === "lists" ? "active" : ""} onClick={() => setActiveView("lists")}>Shopping lists</button><button className={activeView === "catalog" ? "active" : ""} onClick={() => setActiveView("catalog")}>Product catalogue</button></nav>
           <div className="account-menu"><span>{profile.user.firstName} {profile.user.lastName}</span><button className="text-button" onClick={signOut}>Sign out</button></div>
         </header>
         <section className="dashboard-heading">
