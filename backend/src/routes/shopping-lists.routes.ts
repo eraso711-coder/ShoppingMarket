@@ -1,4 +1,4 @@
-import { Router } from "express";
+import { Router, type Response } from "express";
 import { Prisma } from "../generated/prisma/client.js";
 import { prisma } from "../lib/prisma.js";
 import { requireAuth } from "../middleware/auth.middleware.js";
@@ -10,7 +10,7 @@ const ITEM_STATUSES = ["TO_BUY", "IN_CART", "PURCHASED", "UNAVAILABLE"] as const
 type ListStatus = typeof LIST_STATUSES[number];
 type ItemStatus = typeof ITEM_STATUSES[number];
 
-function currentUserId(response: Parameters<Parameters<typeof router.get>[1]>[1]) {
+function currentUserId(response: Response) {
   return response.locals.userId as string;
 }
 
