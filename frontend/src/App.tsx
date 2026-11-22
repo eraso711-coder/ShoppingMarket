@@ -29,6 +29,7 @@ type ShoppingList = {
   _count?: { items: number };
 };
 type ApiError = { error?: string };
+type EditableEntity = { type: "category" | "supermarket" | "product" | "price" | "list"; id: string };
 
 async function apiRequest<T>(path: string, token: string, options: RequestInit = {}): Promise<T> {
   const response = await fetch(`${API_URL}${path}`, {
@@ -155,6 +156,9 @@ function App() {
   const [supermarkets, setSupermarkets] = useState<Supermarket[]>([]);
   const [catalogLoading, setCatalogLoading] = useState(false);
   const [catalogError, setCatalogError] = useState("");
+  const [editingEntity, setEditingEntity] = useState<EditableEntity | null>(null);
+  const [editValues, setEditValues] = useState<Record<string, string>>({});
+  const [savingEdit, setSavingEdit] = useState(false);
   const [productName, setProductName] = useState("");
   const [productBrand, setProductBrand] = useState("");
   const [productBarcode, setProductBarcode] = useState("");
@@ -267,22 +271,9 @@ function App() {
     }
   }
 
-  async function editSelectedList() {
-    if (!token || !selectedList) return;
-    const name = window.prompt("Shopping list name", selectedList.name);
-    if (!name?.trim()) return;
-    const dueAt = window.prompt("Due date/time (optional, ISO format; leave blank to clear)", selectedList.dueAt ?? "");
-    if (dueAt === null) return;
-    setError("");
-    try {
-      await apiRequest(`/shopping-lists/${selectedList.id}`, token, {
-        method: "PATCH",
-        body: JSON.stringify({ name, dueAt: dueAt.trim() || null })
-      });
-      await refreshLists(token);
-    } catch (requestError) {
-      setError(requestError instanceof Error ? requestError.message : "Unable to edit this list.");
-    }
+  function editSelectedList() {
+    if (!selectedList) return;
+    beginEdit("list", selectedList.id, { name: selectedList.name, dueAt: selectedList.dueAt ? new Date(selectedList.dueAt).toISOString().slice(0, 16) : "" });
   }
 
   async function deleteSelectedList() {
@@ -410,95 +401,140 @@ function App() {
   }
 
 
+  function beginEdit(type: EditableEntity["type"], id: string, values: Record<string, string>) {
+    setEditingEntity({ type, id });
+    setEditValues(values);
+    setCatalogError("");
+    setError("");
+  }
+
+  function updateEditField(field: string, value: string) {
+    setEditValues((current) => ({ ...current, [field]: value }));
+  }
+
+  function cancelEdit() {
+    setEditingEntity(null);
+    setEditValues({});
+  }
+
+  async function saveInlineEdit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!token || !editingEntity) return;
+    setSavingEdit(true);
+    setCatalogError("");
+    setError("");
+    try {
+      const { type, id } = editingEntity;
+      if (type === "category") {
+        await apiRequest(`/catalog/categories/${id}`, token, { method: "PATCH", body: JSON.stringify({ name: editValues.name, parentId: editValues.parentId || null }) });
+        const data = await apiRequest<{ categories: CatalogCategory[] }>("/catalog/categories", token);
+        setCatalogCategories(data.categories);
+      } else if (type === "supermarket") {
+        await apiRequest(`/catalog/supermarkets/${id}`, token, { method: "PATCH", body: JSON.stringify({ name: editValues.name, chain: editValues.chain || null, website: editValues.website || null }) });
+        const data = await apiRequest<{ supermarkets: Supermarket[] }>("/catalog/supermarkets", token);
+        setSupermarkets(data.supermarkets);
+      } else if (type === "product") {
+        await apiRequest(`/catalog/products/${id}`, token, { method: "PATCH", body: JSON.stringify({
+          name: editValues.name, brand: editValues.brand || null, barcode: editValues.barcode || null,
+          description: editValues.description || null, categoryId: editValues.categoryId,
+          unit: editValues.unit || null, quantity: editValues.quantity.trim() ? Number(editValues.quantity) : null
+        }) });
+        const data = await apiRequest<{ products: CatalogProduct[] }>(`/catalog/products?q=${encodeURIComponent(catalogQuery)}`, token);
+        setCatalogProducts(data.products);
+      } else if (type === "price") {
+        await apiRequest(`/catalog/prices/${id}`, token, { method: "PATCH", body: JSON.stringify({
+          price: Number(editValues.price), currency: editValues.currency.trim().toUpperCase(),
+          observedAt: new Date(editValues.observedAt).toISOString(), source: editValues.source || null
+        }) });
+        const data = await apiRequest<{ products: CatalogProduct[] }>(`/catalog/products?q=${encodeURIComponent(catalogQuery)}`, token);
+        setCatalogProducts(data.products);
+      } else if (type === "list") {
+        await apiRequest(`/shopping-lists/${id}`, token, { method: "PATCH", body: JSON.stringify({
+          name: editValues.name, dueAt: editValues.dueAt ? new Date(editValues.dueAt).toISOString() : null
+        }) });
+        await refreshLists(token);
+      }
+      cancelEdit();
+    } catch (requestError) {
+      const message = requestError instanceof Error ? requestError.message : "Unable to save these changes.";
+      if (editingEntity?.type === "list") setError(message);
+      else setCatalogError(message);
+    } finally {
+      setSavingEdit(false);
+    }
+  }
+
   async function manageCategory(category: CatalogCategory, action: "edit" | "delete") {
     if (!token) return;
     if (action === "edit") {
-      const name = window.prompt("Category name", category.name);
-      if (!name?.trim()) return;
-      const currentParent = catalogCategories.find((entry) => entry.id === category.parentId)?.name ?? "";
-      const parentName = window.prompt(`Parent category (optional; available: ${catalogCategories.filter((entry) => entry.id !== category.id).map((entry) => entry.name).join(", ")})`, currentParent);
-      if (parentName === null) return;
-      const parentId = parentName.trim() ? catalogCategories.find((entry) => entry.id !== category.id && entry.name.toLowerCase() === parentName.trim().toLowerCase())?.id : null;
-      if (parentName.trim() && !parentId) { setCatalogError("Parent category not found. Enter an existing category name or leave blank."); return; }
-      await apiRequest(`/catalog/categories/${category.id}`, token, { method: "PATCH", body: JSON.stringify({ name, parentId }) });
-    } else {
-      if (!window.confirm(`Delete category "${category.name}"?`)) return;
+      beginEdit("category", category.id, { name: category.name, parentId: category.parentId ?? "" });
+      return;
+    }
+    if (!window.confirm(`Delete category "${category.name}"?`)) return;
+    try {
       await apiRequest(`/catalog/categories/${category.id}`, token, { method: "DELETE" });
       if (productCategoryId === category.id) setProductCategoryId("");
+      const data = await apiRequest<{ categories: CatalogCategory[] }>("/catalog/categories", token);
+      setCatalogCategories(data.categories);
+    } catch (requestError) {
+      setCatalogError(requestError instanceof Error ? requestError.message : "Unable to delete this category.");
     }
-    const data = await apiRequest<{ categories: CatalogCategory[] }>("/catalog/categories", token);
-    setCatalogCategories(data.categories);
   }
 
   async function manageSupermarket(supermarket: Supermarket, action: "edit" | "delete") {
     if (!token) return;
     if (action === "edit") {
-      const name = window.prompt("Supermarket name", supermarket.name);
-      if (!name?.trim()) return;
-      const chain = window.prompt("Chain (optional)", supermarket.chain ?? "");
-      const website = window.prompt("Website URL (optional)", supermarket.website ?? "");
-      await apiRequest(`/catalog/supermarkets/${supermarket.id}`, token, { method: "PATCH", body: JSON.stringify({ name, chain, website }) });
-    } else {
-      if (!window.confirm(`Delete supermarket "${supermarket.name}"? This is only possible when it has no offers or price history.`)) return;
-      await apiRequest(`/catalog/supermarkets/${supermarket.id}`, token, { method: "DELETE" });
+      beginEdit("supermarket", supermarket.id, { name: supermarket.name, chain: supermarket.chain ?? "", website: supermarket.website ?? "" });
+      return;
     }
-    const data = await apiRequest<{ supermarkets: Supermarket[] }>("/catalog/supermarkets", token);
-    setSupermarkets(data.supermarkets);
-    if (priceSupermarketId === supermarket.id && action === "delete") setPriceSupermarketId(data.supermarkets[0]?.id ?? "");
+    if (!window.confirm(`Delete supermarket "${supermarket.name}"? This is only possible when it has no offers or price history.`)) return;
+    try {
+      await apiRequest(`/catalog/supermarkets/${supermarket.id}`, token, { method: "DELETE" });
+      const data = await apiRequest<{ supermarkets: Supermarket[] }>("/catalog/supermarkets", token);
+      setSupermarkets(data.supermarkets);
+      if (priceSupermarketId === supermarket.id) setPriceSupermarketId(data.supermarkets[0]?.id ?? "");
+    } catch (requestError) {
+      setCatalogError(requestError instanceof Error ? requestError.message : "Unable to delete this supermarket.");
+    }
   }
 
   async function manageProduct(product: CatalogProduct, action: "edit" | "delete") {
     if (!token) return;
     if (action === "edit") {
-      const name = window.prompt("Product name", product.name);
-      if (!name?.trim()) return;
-      const brand = window.prompt("Brand (optional)", product.brand ?? "");
-      if (brand === null) return;
-      const barcode = window.prompt("Barcode (optional)", product.barcode ?? "");
-      if (barcode === null) return;
-      const description = window.prompt("Description (optional)", product.description ?? "");
-      if (description === null) return;
-      const unit = window.prompt("Unit (optional, e.g. 1 L or 500 g)", product.unit ?? "");
-      if (unit === null) return;
-      const quantity = window.prompt("Pack quantity (optional; up to 3 decimals)", product.quantity ?? "");
-      if (quantity === null) return;
-      const categoryName = window.prompt(`Category (available: ${catalogCategories.map((category) => category.name).join(", ")})`, product.category?.name ?? "");
-      if (!categoryName?.trim()) return;
-      const categoryId = catalogCategories.find((category) => category.name.toLowerCase() === categoryName.trim().toLowerCase())?.id;
-      if (!categoryId) { setCatalogError("That category was not found. Please enter one of the listed category names."); return; }
-      await apiRequest(`/catalog/products/${product.id}`, token, { method: "PATCH", body: JSON.stringify({ name, brand, barcode, description, unit, quantity: quantity.trim() ? Number(quantity) : null, categoryId }) });
-    } else {
-      if (!window.confirm(`Delete product "${product.name}"? Products used in lists or price history cannot be deleted.`)) return;
-      await apiRequest(`/catalog/products/${product.id}`, token, { method: "DELETE" });
+      beginEdit("product", product.id, {
+        name: product.name, brand: product.brand ?? "", barcode: product.barcode ?? "",
+        description: product.description ?? "", categoryId: product.categoryId ?? product.category?.id ?? "",
+        unit: product.unit ?? "", quantity: product.quantity ?? ""
+      });
+      return;
     }
-    const data = await apiRequest<{ products: CatalogProduct[] }>(`/catalog/products?q=${encodeURIComponent(catalogQuery)}`, token);
-    setCatalogProducts(data.products);
-  }
-
-
-  async function managePrice(observation: CatalogProduct["priceObservations"][number], action: "edit" | "delete") {
-    if (!token) return;
+    if (!window.confirm(`Delete product "${product.name}"? Products used in lists or price history cannot be deleted.`)) return;
     try {
-      if (action === "edit") {
-        const rawPrice = window.prompt("Price amount", observation.price);
-        if (rawPrice === null || rawPrice.trim() === "") return;
-        const price = Number(rawPrice);
-        if (!Number.isFinite(price) || price < 0) { setCatalogError("Enter a valid non-negative price."); return; }
-        const currency = window.prompt("Currency (3-letter code, e.g. COP, EUR, USD)", observation.currency);
-        if (!currency?.trim()) return;
-        const observedAt = window.prompt("Observed date/time (ISO format)", new Date(observation.observedAt).toISOString());
-        if (!observedAt?.trim()) return;
-        const source = window.prompt("Price source / note (optional)", observation.source ?? "");
-        if (source === null) return;
-        await apiRequest(`/catalog/prices/${observation.id}`, token, { method: "PATCH", body: JSON.stringify({ price, currency: currency.trim().toUpperCase(), observedAt, source }) });
-      } else {
-        if (!window.confirm(`Delete the ${observation.price} ${observation.currency} price at ${observation.supermarket.name}?`)) return;
-        await apiRequest(`/catalog/prices/${observation.id}`, token, { method: "DELETE" });
-      }
+      await apiRequest(`/catalog/products/${product.id}`, token, { method: "DELETE" });
       const data = await apiRequest<{ products: CatalogProduct[] }>(`/catalog/products?q=${encodeURIComponent(catalogQuery)}`, token);
       setCatalogProducts(data.products);
     } catch (requestError) {
-      setCatalogError(requestError instanceof Error ? requestError.message : "Unable to update this price.");
+      setCatalogError(requestError instanceof Error ? requestError.message : "Unable to delete this product.");
+    }
+  }
+
+  async function managePrice(observation: CatalogProduct["priceObservations"][number], action: "edit" | "delete") {
+    if (!token) return;
+    if (action === "edit") {
+      beginEdit("price", observation.id, {
+        price: observation.price, currency: observation.currency,
+        observedAt: new Date(observation.observedAt).toISOString().slice(0, 16),
+        source: observation.source ?? ""
+      });
+      return;
+    }
+    if (!window.confirm(`Delete the ${observation.price} ${observation.currency} price at ${observation.supermarket.name}?`)) return;
+    try {
+      await apiRequest(`/catalog/prices/${observation.id}`, token, { method: "DELETE" });
+      const data = await apiRequest<{ products: CatalogProduct[] }>(`/catalog/products?q=${encodeURIComponent(catalogQuery)}`, token);
+      setCatalogProducts(data.products);
+    } catch (requestError) {
+      setCatalogError(requestError instanceof Error ? requestError.message : "Unable to delete this price.");
     }
   }
 
