@@ -425,6 +425,29 @@ function App() {
     setCatalogProducts(data.products);
   }
 
+
+  async function managePrice(productId: string, observation: CatalogProduct["priceObservations"][number], action: "edit" | "delete") {
+    if (!token) return;
+    try {
+      if (action === "edit") {
+        const rawPrice = window.prompt("Price amount", observation.price);
+        if (rawPrice === null || rawPrice.trim() === "") return;
+        const price = Number(rawPrice);
+        if (!Number.isFinite(price) || price < 0) { setCatalogError("Enter a valid non-negative price."); return; }
+        const currency = window.prompt("Currency (3-letter code, e.g. EUR, USD, GBP)", observation.currency);
+        if (!currency?.trim()) return;
+        await apiRequest(`/catalog/prices/${observation.id}`, token, { method: "PATCH", body: JSON.stringify({ price, currency: currency.trim().toUpperCase() }) });
+      } else {
+        if (!window.confirm(`Delete the ${observation.price} ${observation.currency} price at ${observation.supermarket.name}?`)) return;
+        await apiRequest(`/catalog/prices/${observation.id}`, token, { method: "DELETE" });
+      }
+      const data = await apiRequest<{ products: CatalogProduct[] }>(`/catalog/products?q=${encodeURIComponent(catalogQuery)}`, token);
+      setCatalogProducts(data.products);
+    } catch (requestError) {
+      setCatalogError(requestError instanceof Error ? requestError.message : "Unable to update this price.");
+    }
+  }
+
   async function savePrice(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!token || !priceProductId || !priceSupermarketId) return;
@@ -553,7 +576,7 @@ function App() {
           {catalogLoading ? <div className="empty-dashboard">Loading catalogue…</div> : catalogProducts.length ? <div className="product-grid">{catalogProducts.map((product) => <article className="product-card" key={product.id}>
             <div className="product-card-top"><span className="product-category">{product.category?.name ?? "Uncategorised"}</span><span className="product-unit">{product.unit ?? "Product"}</span></div>
             <h3>{product.name}</h3><p className="product-brand">{product.brand ?? "No brand specified"}</p>
-            <div className="product-prices">{product.priceObservations.length ? [...product.priceObservations].sort((a, b) => a.currency === b.currency ? Number(a.price) - Number(b.price) : a.currency.localeCompare(b.currency)).map((observation) => <div key={observation.id}><span>{observation.supermarket.name}</span><strong>{Number(observation.price).toFixed(2)} {observation.currency}</strong></div>) : <p>No prices recorded yet.</p>}</div>
+            <div className="product-prices">{product.priceObservations.length ? [...product.priceObservations].sort((a, b) => a.currency === b.currency ? Number(a.price) - Number(b.price) : a.currency.localeCompare(b.currency)).map((observation) => <div key={observation.id}><span>{observation.supermarket.name}</span><strong>{Number(observation.price).toFixed(2)} {observation.currency}</strong><span className="price-management-actions"><button type="button" onClick={() => managePrice(product.id, observation, "edit")}>Edit</button><button type="button" onClick={() => managePrice(product.id, observation, "delete")}>Delete</button></span></div>) : <p>No prices recorded yet.</p>}</div>
             <div className="product-card-actions">{selectedListId && <button className="primary-action" onClick={() => addCatalogueProductToList(product)}>Add to selected list</button>}<button className="secondary-action" onClick={() => manageProduct(product, "edit")}>Edit product</button><button className="secondary-action" onClick={() => manageProduct(product, "delete")}>Delete</button><button className="secondary-action" onClick={() => { setPriceProductId(priceProductId === product.id ? null : product.id); setPriceValue(""); }}>Record a price</button></div>
             {priceProductId === product.id && <form className="record-price-form" onSubmit={savePrice}><strong>Record price at {product.name}</strong><select value={priceSupermarketId} onChange={(event) => setPriceSupermarketId(event.target.value)} required><option value="">Choose supermarket</option>{supermarkets.map((supermarket) => <option key={supermarket.id} value={supermarket.id}>{supermarket.name}{supermarket.chain ? ` · ${supermarket.chain}` : ""}</option>)}</select><div><input type="number" min="0" max="99999999.99" step="0.01" value={priceValue} onChange={(event) => setPriceValue(event.target.value)} placeholder="Price amount" required /><select aria-label="Price currency" value={priceCurrency} onChange={(event) => setPriceCurrency(event.target.value)}><option value="EUR">EUR €</option><option value="USD">USD $</option><option value="GBP">GBP £</option><option value="CHF">CHF</option><option value="CAD">CAD $</option><option value="AUD">AUD $</option></select><button className="primary-action" type="submit" disabled={savingPrice || !priceSupermarketId || priceValue === ""}>{savingPrice ? "Saving…" : "Save price"}</button></div></form>}
           </article>)}</div> : <div className="empty-dashboard"><div className="empty-illustration">⌕</div><h2>No products found</h2><p>Add your first product using the form above, or try another search.</p></div>}
