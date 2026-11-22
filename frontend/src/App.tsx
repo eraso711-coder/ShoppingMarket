@@ -6,8 +6,8 @@ type User = { id: string; email: string; firstName: string; lastName: string };
 type Family = { id: string; name: string; role: string } | null;
 type Profile = { user: User; family: Family };
 type ProductSummary = { id: string; name: string; brand: string | null } | null;
-type CatalogProduct = { id: string; name: string; brand: string | null; barcode: string | null; unit: string | null; category: { id: string; name: string } | null; priceObservations: { id: string; price: string; currency: string; observedAt: string; supermarket: { id: string; name: string; chain: string | null } }[] };
-type CatalogCategory = { id: string; name: string; _count?: { products: number } };
+type CatalogProduct = { id: string; name: string; brand: string | null; barcode: string | null; description: string | null; categoryId: string | null; quantity: string | null; unit: string | null; category: { id: string; name: string } | null; priceObservations: { id: string; price: string; currency: string; observedAt: string; source: string | null; supermarket: { id: string; name: string; chain: string | null } }[] };
+type CatalogCategory = { id: string; name: string; parentId?: string | null; _count?: { products: number } };
 type Supermarket = { id: string; name: string; chain: string | null; website: string | null; _count?: { offers: number; prices: number } };
 type Item = {
   id: string;
@@ -156,11 +156,15 @@ function App() {
   const [catalogError, setCatalogError] = useState("");
   const [productName, setProductName] = useState("");
   const [productBrand, setProductBrand] = useState("");
+  const [productBarcode, setProductBarcode] = useState("");
+  const [productDescription, setProductDescription] = useState("");
+  const [productQuantity, setProductQuantity] = useState("");
   const [productCategoryId, setProductCategoryId] = useState("");
   const [productUnit, setProductUnit] = useState("");
   const [creatingProduct, setCreatingProduct] = useState(false);
   const [supermarketName, setSupermarketName] = useState("");
   const [supermarketChain, setSupermarketChain] = useState("");
+  const [supermarketWebsite, setSupermarketWebsite] = useState("");
   const [creatingSupermarket, setCreatingSupermarket] = useState(false);
   const [priceProductId, setPriceProductId] = useState<string | null>(null);
   const [priceValue, setPriceValue] = useState("");
@@ -262,6 +266,36 @@ function App() {
     }
   }
 
+  async function editSelectedList() {
+    if (!token || !selectedList) return;
+    const name = window.prompt("Shopping list name", selectedList.name);
+    if (!name?.trim()) return;
+    const dueAt = window.prompt("Due date/time (optional, ISO format; leave blank to clear)", selectedList.dueAt ?? "");
+    if (dueAt === null) return;
+    setError("");
+    try {
+      await apiRequest(`/shopping-lists/${selectedList.id}`, token, {
+        method: "PATCH",
+        body: JSON.stringify({ name, dueAt: dueAt.trim() || null })
+      });
+      await refreshLists(token);
+    } catch (requestError) {
+      setError(requestError instanceof Error ? requestError.message : "Unable to edit this list.");
+    }
+  }
+
+  async function deleteSelectedList() {
+    if (!token || !selectedList) return;
+    if (!window.confirm(`Delete "${selectedList.name}" and all its items? This cannot be undone.`)) return;
+    setError("");
+    try {
+      await apiRequest(`/shopping-lists/${selectedList.id}`, token, { method: "DELETE" });
+      await refreshLists(token);
+    } catch (requestError) {
+      setError(requestError instanceof Error ? requestError.message : "Unable to delete this list.");
+    }
+  }
+
   async function addItem(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!token || !selectedListId) return;
@@ -328,9 +362,9 @@ function App() {
     try {
       await apiRequest("/catalog/products", token, {
         method: "POST",
-        body: JSON.stringify({ name: productName, brand: productBrand || null, categoryId: productCategoryId || null, unit: productUnit || null })
+        body: JSON.stringify({ name: productName, brand: productBrand || null, barcode: productBarcode || null, description: productDescription || null, categoryId: productCategoryId || null, unit: productUnit || null, quantity: productQuantity === "" ? null : Number(productQuantity) })
       });
-      setProductName(""); setProductBrand(""); setProductCategoryId(""); setProductUnit("");
+      setProductName(""); setProductBrand(""); setProductBarcode(""); setProductDescription(""); setProductCategoryId(""); setProductUnit(""); setProductQuantity("");
       const refreshed = await apiRequest<{ products: CatalogProduct[] }>(`/catalog/products?q=${encodeURIComponent(catalogQuery)}`, token);
       setCatalogProducts(refreshed.products);
     } catch (requestError) {
@@ -364,11 +398,11 @@ function App() {
     try {
       const data = await apiRequest<{ supermarket: Supermarket }>("/catalog/supermarkets", token, {
         method: "POST",
-        body: JSON.stringify({ name: supermarketName, chain: supermarketChain || null })
+        body: JSON.stringify({ name: supermarketName, chain: supermarketChain || null, website: supermarketWebsite || null })
       });
       setSupermarkets((current) => [...current, data.supermarket].sort((a, b) => a.name.localeCompare(b.name)));
       setPriceSupermarketId(data.supermarket.id);
-      setSupermarketName(""); setSupermarketChain("");
+      setSupermarketName(""); setSupermarketChain(""); setSupermarketWebsite("");
     } catch (requestError) {
       setCatalogError(requestError instanceof Error ? requestError.message : "Unable to create the supermarket.");
     } finally { setCreatingSupermarket(false); }
@@ -380,7 +414,12 @@ function App() {
     if (action === "edit") {
       const name = window.prompt("Category name", category.name);
       if (!name?.trim()) return;
-      await apiRequest(`/catalog/categories/${category.id}`, token, { method: "PATCH", body: JSON.stringify({ name }) });
+      const currentParent = catalogCategories.find((entry) => entry.id === category.parentId)?.name ?? "";
+      const parentName = window.prompt(`Parent category (optional; available: ${catalogCategories.filter((entry) => entry.id !== category.id).map((entry) => entry.name).join(", ")})`, currentParent);
+      if (parentName === null) return;
+      const parentId = parentName.trim() ? catalogCategories.find((entry) => entry.id !== category.id && entry.name.toLowerCase() === parentName.trim().toLowerCase())?.id : null;
+      if (parentName.trim() && !parentId) { setCatalogError("Parent category not found. Enter an existing category name or leave blank."); return; }
+      await apiRequest(`/catalog/categories/${category.id}`, token, { method: "PATCH", body: JSON.stringify({ name, parentId }) });
     } else {
       if (!window.confirm(`Delete category "${category.name}"?`)) return;
       await apiRequest(`/catalog/categories/${category.id}`, token, { method: "DELETE" });
@@ -413,12 +452,20 @@ function App() {
       const name = window.prompt("Product name", product.name);
       if (!name?.trim()) return;
       const brand = window.prompt("Brand (optional)", product.brand ?? "");
-      const unit = window.prompt("Unit (optional)", product.unit ?? "");
-      const categoryName = window.prompt(`Category name (available: ${catalogCategories.map((category) => category.name).join(", ")})`, product.category?.name ?? "");
+      if (brand === null) return;
+      const barcode = window.prompt("Barcode (optional)", product.barcode ?? "");
+      if (barcode === null) return;
+      const description = window.prompt("Description (optional)", product.description ?? "");
+      if (description === null) return;
+      const unit = window.prompt("Unit (optional, e.g. 1 L or 500 g)", product.unit ?? "");
+      if (unit === null) return;
+      const quantity = window.prompt("Pack quantity (optional; up to 3 decimals)", product.quantity ?? "");
+      if (quantity === null) return;
+      const categoryName = window.prompt(`Category (available: ${catalogCategories.map((category) => category.name).join(", ")})`, product.category?.name ?? "");
       if (!categoryName?.trim()) return;
       const categoryId = catalogCategories.find((category) => category.name.toLowerCase() === categoryName.trim().toLowerCase())?.id;
       if (!categoryId) { setCatalogError("That category was not found. Please enter one of the listed category names."); return; }
-      await apiRequest(`/catalog/products/${product.id}`, token, { method: "PATCH", body: JSON.stringify({ name, brand, unit, categoryId }) });
+      await apiRequest(`/catalog/products/${product.id}`, token, { method: "PATCH", body: JSON.stringify({ name, brand, barcode, description, unit, quantity: quantity.trim() ? Number(quantity) : null, categoryId }) });
     } else {
       if (!window.confirm(`Delete product "${product.name}"? Products used in lists or price history cannot be deleted.`)) return;
       await apiRequest(`/catalog/products/${product.id}`, token, { method: "DELETE" });
@@ -436,9 +483,13 @@ function App() {
         if (rawPrice === null || rawPrice.trim() === "") return;
         const price = Number(rawPrice);
         if (!Number.isFinite(price) || price < 0) { setCatalogError("Enter a valid non-negative price."); return; }
-        const currency = window.prompt("Currency (3-letter code, e.g. EUR, USD, GBP)", observation.currency);
+        const currency = window.prompt("Currency (3-letter code, e.g. COP, EUR, USD)", observation.currency);
         if (!currency?.trim()) return;
-        await apiRequest(`/catalog/prices/${observation.id}`, token, { method: "PATCH", body: JSON.stringify({ price, currency: currency.trim().toUpperCase() }) });
+        const observedAt = window.prompt("Observed date/time (ISO format)", new Date(observation.observedAt).toISOString());
+        if (!observedAt?.trim()) return;
+        const source = window.prompt("Price source / note (optional)", observation.source ?? "");
+        if (source === null) return;
+        await apiRequest(`/catalog/prices/${observation.id}`, token, { method: "PATCH", body: JSON.stringify({ price, currency: currency.trim().toUpperCase(), observedAt, source }) });
       } else {
         if (!window.confirm(`Delete the ${observation.price} ${observation.currency} price at ${observation.supermarket.name}?`)) return;
         await apiRequest(`/catalog/prices/${observation.id}`, token, { method: "DELETE" });
@@ -528,7 +579,11 @@ function App() {
             {selectedList ? <>
               <div className="detail-heading">
                 <div><span className="preview-kicker">{selectedList.family.name.toUpperCase()}</span><h2>{selectedList.name}</h2><p>{selectedList.items.length} {selectedList.items.length === 1 ? "item" : "items"} · {selectedList.items.filter((item) => item.status === "PURCHASED").length} purchased</p></div>
-                {selectedList.status !== "ARCHIVED" && <button className={selectedList.status === "COMPLETED" ? "secondary-action" : "primary-action"} onClick={() => updateListStatus(selectedList.status === "COMPLETED" ? "ACTIVE" : "COMPLETED")}>{selectedList.status === "COMPLETED" ? "Reopen list" : "Complete list"}</button>}
+                <div className="list-management-actions">
+                  <button className="secondary-action" type="button" onClick={editSelectedList}>Edit list</button>
+                  <button className="secondary-action" type="button" onClick={deleteSelectedList}>Delete list</button>
+                  {selectedList.status !== "ARCHIVED" && <button className={selectedList.status === "COMPLETED" ? "secondary-action" : "primary-action"} onClick={() => updateListStatus(selectedList.status === "COMPLETED" ? "ACTIVE" : "COMPLETED")}>{selectedList.status === "COMPLETED" ? "Reopen list" : "Complete list"}</button>}
+                </div>
               </div>
               <div className="progress-track"><span style={{ width: `${selectedList.items.length ? selectedList.items.filter((item) => item.status === "PURCHASED").length / selectedList.items.length * 100 : 0}%` }} /></div>
               {selectedList.items.length > 0 ? <div className="items-list">
@@ -564,15 +619,18 @@ function App() {
               <div className="catalog-form-title"><span className="preview-kicker">ADD TO CATALOGUE</span><strong>New product</strong></div>
               <input value={productName} onChange={(event) => setProductName(event.target.value)} placeholder="Product name" maxLength={150} required />
               <input value={productBrand} onChange={(event) => setProductBrand(event.target.value)} placeholder="Brand (optional)" maxLength={100} />
+              <input value={productBarcode} onChange={(event) => setProductBarcode(event.target.value)} placeholder="Barcode (optional)" maxLength={64} />
+              <textarea value={productDescription} onChange={(event) => setProductDescription(event.target.value)} placeholder="Description (optional)" maxLength={1000} rows={2} />
               <select value={productCategoryId} onChange={(event) => setProductCategoryId(event.target.value)} required disabled={catalogCategories.length === 0}><option value="">Choose a category *</option>{catalogCategories.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}</select>
-              <div className="catalog-form-row"><input value={productUnit} onChange={(event) => setProductUnit(event.target.value)} placeholder="Unit, e.g. 1 L or 500 g" maxLength={30} /><button className="primary-action" type="submit" disabled={creatingProduct || !productName.trim() || !productCategoryId}>{creatingProduct ? "Saving…" : "Add product"}</button></div>
+              <div className="catalog-form-row"><input value={productUnit} onChange={(event) => setProductUnit(event.target.value)} placeholder="Unit (e.g. bottle, pack)" maxLength={30} /><input type="number" min="0.001" max="9999999.999" step="0.001" value={productQuantity} onChange={(event) => setProductQuantity(event.target.value)} placeholder="Pack quantity" /><button className="primary-action" type="submit" disabled={creatingProduct || !productName.trim() || !productCategoryId}>{creatingProduct ? "Saving…" : "Add product"}</button></div>
               {catalogCategories.length === 0 && <p className="catalog-form-hint">Create your first category above before adding products.</p>}
             </form>
             <form className="catalog-create-form supermarket-form" onSubmit={createSupermarket}>
               <div className="catalog-form-title"><span className="preview-kicker">PRICE SOURCES</span><strong>Supermarkets</strong></div>
               <div className="catalog-form-row"><input value={supermarketName} onChange={(event) => setSupermarketName(event.target.value)} placeholder="Supermarket name" maxLength={100} required /><input value={supermarketChain} onChange={(event) => setSupermarketChain(event.target.value)} placeholder="Chain (optional)" maxLength={100} /></div>
+              <input type="url" value={supermarketWebsite} onChange={(event) => setSupermarketWebsite(event.target.value)} placeholder="Website URL (optional, https://…)" maxLength={300} />
               <button className="secondary-action" type="submit" disabled={creatingSupermarket || !supermarketName.trim()}>{creatingSupermarket ? "Saving…" : "Add supermarket"}</button>
-              <p>{supermarkets.length} supermarket{supermarkets.length === 1 ? "" : "s"} in your directory</p><div className="directory-list">{supermarkets.map((market) => <div key={market.id}><span><strong>{market.name}</strong>{market.chain ? ` · ${market.chain}` : ""}</span><span><button type="button" onClick={() => manageSupermarket(market, "edit")}>Edit</button><button type="button" onClick={() => manageSupermarket(market, "delete")}>Delete</button></span></div>)}</div>
+              <p>{supermarkets.length} supermarket{supermarkets.length === 1 ? "" : "s"} in your directory</p><div className="directory-list">{supermarkets.map((market) => <div key={market.id}><span><strong>{market.name}</strong>{market.chain ? ` · ${market.chain}` : ""}{market.website ? <a href={market.website} target="_blank" rel="noreferrer"> · Website</a> : ""}</span><span><button type="button" onClick={() => manageSupermarket(market, "edit")}>Edit</button><button type="button" onClick={() => manageSupermarket(market, "delete")}>Delete</button></span></div>)}</div>
             </form>
           </div>
           <div className="catalog-results-toolbar">
