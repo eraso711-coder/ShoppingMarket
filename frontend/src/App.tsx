@@ -7,8 +7,8 @@ type Family = { id: string; name: string; role: string } | null;
 type Profile = { user: User; family: Family };
 type ProductSummary = { id: string; name: string; brand: string | null } | null;
 type CatalogProduct = { id: string; name: string; brand: string | null; barcode: string | null; unit: string | null; category: { id: string; name: string } | null; priceObservations: { id: string; price: string; currency: string; observedAt: string; supermarket: { id: string; name: string; chain: string | null } }[] };
-type CatalogCategory = { id: string; name: string };
-type Supermarket = { id: string; name: string; chain: string | null; website: string | null };
+type CatalogCategory = { id: string; name: string; _count?: { products: number } };
+type Supermarket = { id: string; name: string; chain: string | null; website: string | null; _count?: { offers: number; prices: number } };
 type Item = {
   id: string;
   customName: string | null;
@@ -163,6 +163,7 @@ function App() {
   const [priceProductId, setPriceProductId] = useState<string | null>(null);
   const [priceValue, setPriceValue] = useState("");
   const [priceSupermarketId, setPriceSupermarketId] = useState("");
+  const [priceCurrency, setPriceCurrency] = useState("EUR");
   const [savingPrice, setSavingPrice] = useState(false);
   const [newListName, setNewListName] = useState("");
   const [newItemName, setNewItemName] = useState("");
@@ -371,6 +372,57 @@ function App() {
     } finally { setCreatingSupermarket(false); }
   }
 
+
+  async function manageCategory(category: CatalogCategory, action: "edit" | "delete") {
+    if (!token) return;
+    if (action === "edit") {
+      const name = window.prompt("Category name", category.name);
+      if (!name?.trim()) return;
+      await apiRequest(`/catalog/categories/${category.id}`, token, { method: "PATCH", body: JSON.stringify({ name }) });
+    } else {
+      if (!window.confirm(`Delete category "${category.name}"?`)) return;
+      await apiRequest(`/catalog/categories/${category.id}`, token, { method: "DELETE" });
+      if (productCategoryId === category.id) setProductCategoryId("");
+    }
+    const data = await apiRequest<{ categories: CatalogCategory[] }>("/catalog/categories", token);
+    setCatalogCategories(data.categories);
+  }
+
+  async function manageSupermarket(supermarket: Supermarket, action: "edit" | "delete") {
+    if (!token) return;
+    if (action === "edit") {
+      const name = window.prompt("Supermarket name", supermarket.name);
+      if (!name?.trim()) return;
+      const chain = window.prompt("Chain (optional)", supermarket.chain ?? "");
+      const website = window.prompt("Website URL (optional)", supermarket.website ?? "");
+      await apiRequest(`/catalog/supermarkets/${supermarket.id}`, token, { method: "PATCH", body: JSON.stringify({ name, chain, website }) });
+    } else {
+      if (!window.confirm(`Delete supermarket "${supermarket.name}"? This is only possible when it has no offers or price history.`)) return;
+      await apiRequest(`/catalog/supermarkets/${supermarket.id}`, token, { method: "DELETE" });
+    }
+    const data = await apiRequest<{ supermarkets: Supermarket[] }>("/catalog/supermarkets", token);
+    setSupermarkets(data.supermarkets);
+    if (priceSupermarketId === supermarket.id && action === "delete") setPriceSupermarketId(data.supermarkets[0]?.id ?? "");
+  }
+
+  async function manageProduct(product: CatalogProduct, action: "edit" | "delete") {
+    if (!token) return;
+    if (action === "edit") {
+      const name = window.prompt("Product name", product.name);
+      if (!name?.trim()) return;
+      const brand = window.prompt("Brand (optional)", product.brand ?? "");
+      const unit = window.prompt("Unit (optional)", product.unit ?? "");
+      const categoryId = window.prompt("Category ID (choose from the category selector below):", product.category?.id ?? "");
+      if (!categoryId) return;
+      await apiRequest(`/catalog/products/${product.id}`, token, { method: "PATCH", body: JSON.stringify({ name, brand, unit, categoryId }) });
+    } else {
+      if (!window.confirm(`Delete product "${product.name}"? Products used in lists or price history cannot be deleted.`)) return;
+      await apiRequest(`/catalog/products/${product.id}`, token, { method: "DELETE" });
+    }
+    const data = await apiRequest<{ products: CatalogProduct[] }>(`/catalog/products?q=${encodeURIComponent(catalogQuery)}`, token);
+    setCatalogProducts(data.products);
+  }
+
   async function savePrice(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!token || !priceProductId || !priceSupermarketId) return;
@@ -379,9 +431,9 @@ function App() {
     try {
       await apiRequest(`/catalog/products/${priceProductId}/prices`, token, {
         method: "POST",
-        body: JSON.stringify({ supermarketId: priceSupermarketId, price: Number(priceValue), currency: "EUR", source: "manual-entry" })
+        body: JSON.stringify({ supermarketId: priceSupermarketId, price: Number(priceValue), currency: priceCurrency, source: "manual-entry" })
       });
-      setPriceProductId(null); setPriceValue("");
+      setPriceProductId(null); setPriceValue(""); setPriceCurrency("EUR");
       const data = await apiRequest<{ products: CatalogProduct[] }>(`/catalog/products?q=${encodeURIComponent(catalogQuery)}`, token);
       setCatalogProducts(data.products);
     } catch (requestError) {
@@ -475,7 +527,7 @@ function App() {
               <button className="primary-action" type="submit" disabled={creatingCategory || !categoryName.trim()}>{creatingCategory ? "Creating…" : "＋ Add category"}</button>
             </form>
             <div className="category-list" aria-live="polite">
-              {catalogCategories.length ? catalogCategories.map((category) => <span className={productCategoryId === category.id ? "category-chip selected" : "category-chip"} key={category.id}>{category.name}{productCategoryId === category.id ? " ✓" : ""}</span>) : <p className="category-empty">No categories yet. Add your first category above to get started.</p>}
+              {catalogCategories.length ? catalogCategories.map((category) => <span className={productCategoryId === category.id ? "category-chip selected" : "category-chip"} key={category.id}>{category.name}{productCategoryId === category.id ? " ✓" : ""} <button type="button" onClick={() => manageCategory(category, "edit")}>Edit</button> <button type="button" onClick={() => manageCategory(category, "delete")}>Delete</button></span>) : <p className="category-empty">No categories yet. Add your first category above to get started.</p>}
             </div>
           </section>
           <div className="catalog-tools">
@@ -492,7 +544,7 @@ function App() {
               <div className="catalog-form-title"><span className="preview-kicker">PRICE SOURCES</span><strong>Supermarkets</strong></div>
               <div className="catalog-form-row"><input value={supermarketName} onChange={(event) => setSupermarketName(event.target.value)} placeholder="Supermarket name" maxLength={100} required /><input value={supermarketChain} onChange={(event) => setSupermarketChain(event.target.value)} placeholder="Chain (optional)" maxLength={100} /></div>
               <button className="secondary-action" type="submit" disabled={creatingSupermarket || !supermarketName.trim()}>{creatingSupermarket ? "Saving…" : "Add supermarket"}</button>
-              <p>{supermarkets.length} supermarket{supermarkets.length === 1 ? "" : "s"} in your directory</p>
+              <p>{supermarkets.length} supermarket{supermarkets.length === 1 ? "" : "s"} in your directory</p><div className="directory-list">{supermarkets.map((market) => <div key={market.id}><span><strong>{market.name}</strong>{market.chain ? ` · ${market.chain}` : ""}</span><span><button type="button" onClick={() => manageSupermarket(market, "edit")}>Edit</button><button type="button" onClick={() => manageSupermarket(market, "delete")}>Delete</button></span></div>)}</div>
             </form>
           </div>
           <div className="catalog-results-heading"><h3>Products</h3><span>Latest recorded prices appear under each product.</span></div>
@@ -500,8 +552,8 @@ function App() {
             <div className="product-card-top"><span className="product-category">{product.category?.name ?? "Uncategorised"}</span><span className="product-unit">{product.unit ?? "Product"}</span></div>
             <h3>{product.name}</h3><p className="product-brand">{product.brand ?? "No brand specified"}</p>
             <div className="product-prices">{product.priceObservations.length ? [...product.priceObservations].sort((a, b) => a.currency === b.currency ? Number(a.price) - Number(b.price) : a.currency.localeCompare(b.currency)).map((observation) => <div key={observation.id}><span>{observation.supermarket.name}</span><strong>{Number(observation.price).toFixed(2)} {observation.currency}</strong></div>) : <p>No prices recorded yet.</p>}</div>
-            <div className="product-card-actions">{selectedListId && <button className="primary-action" onClick={() => addCatalogueProductToList(product)}>Add to selected list</button>}<button className="secondary-action" onClick={() => { setPriceProductId(priceProductId === product.id ? null : product.id); setPriceValue(""); }}>Record a price</button></div>
-            {priceProductId === product.id && <form className="record-price-form" onSubmit={savePrice}><strong>Record price at {product.name}</strong><select value={priceSupermarketId} onChange={(event) => setPriceSupermarketId(event.target.value)} required><option value="">Choose supermarket</option>{supermarkets.map((supermarket) => <option key={supermarket.id} value={supermarket.id}>{supermarket.name}{supermarket.chain ? ` · ${supermarket.chain}` : ""}</option>)}</select><div><input type="number" min="0" max="99999999.99" step="0.01" value={priceValue} onChange={(event) => setPriceValue(event.target.value)} placeholder="Price in EUR" required /><button className="primary-action" type="submit" disabled={savingPrice || !priceSupermarketId || priceValue === ""}>{savingPrice ? "Saving…" : "Save price"}</button></div></form>}
+            <div className="product-card-actions">{selectedListId && <button className="primary-action" onClick={() => addCatalogueProductToList(product)}>Add to selected list</button>}<button className="secondary-action" onClick={() => manageProduct(product, "edit")}>Edit product</button><button className="secondary-action" onClick={() => manageProduct(product, "delete")}>Delete</button><button className="secondary-action" onClick={() => { setPriceProductId(priceProductId === product.id ? null : product.id); setPriceValue(""); }}>Record a price</button></div>
+            {priceProductId === product.id && <form className="record-price-form" onSubmit={savePrice}><strong>Record price at {product.name}</strong><select value={priceSupermarketId} onChange={(event) => setPriceSupermarketId(event.target.value)} required><option value="">Choose supermarket</option>{supermarkets.map((supermarket) => <option key={supermarket.id} value={supermarket.id}>{supermarket.name}{supermarket.chain ? ` · ${supermarket.chain}` : ""}</option>)}</select><div><input type="number" min="0" max="99999999.99" step="0.01" value={priceValue} onChange={(event) => setPriceValue(event.target.value)} placeholder="Price amount" required /><select aria-label="Price currency" value={priceCurrency} onChange={(event) => setPriceCurrency(event.target.value)}><option value="EUR">EUR €</option><option value="USD">USD $</option><option value="GBP">GBP £</option><option value="CHF">CHF</option><option value="CAD">CAD $</option><option value="AUD">AUD $</option></select><button className="primary-action" type="submit" disabled={savingPrice || !priceSupermarketId || priceValue === ""}>{savingPrice ? "Saving…" : "Save price"}</button></div></form>}
           </article>)}</div> : <div className="empty-dashboard"><div className="empty-illustration">⌕</div><h2>No products found</h2><p>Add your first product using the form above, or try another search.</p></div>}
         </section>}
         <footer className="app-footer"><span>ShoppingMarket</span><span>Shared lists for better everyday shopping.</span></footer>
