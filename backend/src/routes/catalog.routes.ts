@@ -303,6 +303,34 @@ router.get("/products/:productId/prices", async (request, response, next) => {
   }
 });
 
+
+router.patch("/prices/:priceId", async (request, response, next) => {
+  try {
+    const { price, currency } = request.body ?? {};
+    if (typeof price !== "number" || !Number.isFinite(price) || price < 0 || price > 99999999.99 ||
+        typeof currency !== "string" || !/^[A-Za-z]{3}$/.test(currency)) {
+      response.status(400).json({ error: "Provide a valid non-negative price and 3-letter currency code." }); return;
+    }
+    const existing = await prisma.priceObservation.findUnique({ where: { id: request.params.priceId }, select: { id: true } });
+    if (!existing) { response.status(404).json({ error: "Price observation not found." }); return; }
+    const observation = await prisma.priceObservation.update({
+      where: { id: existing.id },
+      data: { price: new Prisma.Decimal(price), currency: currency.toUpperCase() },
+      include: { supermarket: { select: { id: true, name: true, chain: true } } }
+    });
+    response.json({ observation });
+  } catch (error) { next(error); }
+});
+
+router.delete("/prices/:priceId", async (request, response, next) => {
+  try {
+    const existing = await prisma.priceObservation.findUnique({ where: { id: request.params.priceId }, select: { id: true } });
+    if (!existing) { response.status(404).json({ error: "Price observation not found." }); return; }
+    await prisma.priceObservation.delete({ where: { id: existing.id } });
+    response.status(204).end();
+  } catch (error) { next(error); }
+});
+
 // Record a manual or imported price observation and keep the supermarket offer in sync.
 router.post("/products/:productId/prices", async (request, response, next) => {
   try {
