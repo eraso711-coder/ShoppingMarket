@@ -150,6 +150,7 @@ function App() {
   const [catalogProducts, setCatalogProducts] = useState<CatalogProduct[]>([]);
   const [catalogCategories, setCatalogCategories] = useState<CatalogCategory[]>([]);
   const [categoryName, setCategoryName] = useState("");
+  const [categoryParentId, setCategoryParentId] = useState("");
   const [creatingCategory, setCreatingCategory] = useState(false);
   const [supermarkets, setSupermarkets] = useState<Supermarket[]>([]);
   const [catalogLoading, setCatalogLoading] = useState(false);
@@ -380,11 +381,11 @@ function App() {
     try {
       const data = await apiRequest<{ category: CatalogCategory }>("/catalog/categories", token, {
         method: "POST",
-        body: JSON.stringify({ name: categoryName })
+        body: JSON.stringify({ name: categoryName, parentId: categoryParentId || null })
       });
       setCatalogCategories((current) => [...current, data.category].sort((a, b) => a.name.localeCompare(b.name)));
       setProductCategoryId(data.category.id);
-      setCategoryName("");
+      setCategoryName(""); setCategoryParentId("");
     } catch (requestError) {
       setCatalogError(requestError instanceof Error ? requestError.message : "Unable to create the category.");
     } finally { setCreatingCategory(false); }
@@ -607,10 +608,11 @@ function App() {
             <form className="category-create-form" onSubmit={createCategory}>
               <label className="sr-only" htmlFor="new-category-name">New category name</label>
               <input id="new-category-name" value={categoryName} onChange={(event) => setCategoryName(event.target.value)} placeholder="Enter a category name, e.g. Dairy" maxLength={80} required />
+              <select aria-label="Parent category (optional)" value={categoryParentId} onChange={(event) => setCategoryParentId(event.target.value)}><option value="">No parent category</option>{catalogCategories.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}</select>
               <button className="primary-action" type="submit" disabled={creatingCategory || !categoryName.trim()}>{creatingCategory ? "Creating…" : "＋ Add category"}</button>
             </form>
             <div className="category-list" aria-live="polite">
-              {catalogCategories.length ? catalogCategories.map((category) => <span className={productCategoryId === category.id ? "category-chip selected" : "category-chip"} key={category.id}>{category.name}{productCategoryId === category.id ? " ✓" : ""} <button type="button" onClick={() => manageCategory(category, "edit")}>Edit</button> <button type="button" onClick={() => manageCategory(category, "delete")}>Delete</button></span>) : <p className="category-empty">No categories yet. Add your first category above to get started.</p>}
+              {catalogCategories.length ? catalogCategories.map((category) => <span className={productCategoryId === category.id ? "category-chip selected" : "category-chip"} key={category.id}>{category.name}{category.parentId ? ` · ${catalogCategories.find((entry) => entry.id === category.parentId)?.name ?? "Subcategory"}` : ""}{productCategoryId === category.id ? " ✓" : ""} <button type="button" onClick={() => manageCategory(category, "edit")}>Edit</button> <button type="button" onClick={() => manageCategory(category, "delete")}>Delete</button></span>) : <p className="category-empty">No categories yet. Add your first category above to get started.</p>}
             </div>
           </section>
           <div className="catalog-tools">
