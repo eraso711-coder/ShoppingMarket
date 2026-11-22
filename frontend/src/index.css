@@ -73,3 +73,7 @@ h1{max-width:570px;margin:20px 0 18px;font-family:Manrope,sans-serif;font-size:c
 .product-price-heading button{height:32px;padding:0 10px;font-size:9px}
 .product-price-management .product-prices{padding:8px 0;border-top:0;border-bottom:0}
 @media(max-width:760px){.product-row-main{align-items:flex-start;flex-wrap:wrap;gap:10px}.product-row-identity{flex-basis:calc(100% - 140px)}.product-row-summary{min-width:120px}.product-row-actions{width:100%}.product-row-actions button{flex:1}.catalog-results-toolbar{align-items:stretch;flex-direction:column}.category-filter{min-width:0}.product-price-heading{align-items:flex-start}}
+
+
+.list-management-actions{display:flex;align-items:center;justify-content:flex-end;flex-wrap:wrap;gap:8px}
+@media(max-width:760px){.list-management-actions{justify-content:flex-start;width:100%}.detail-heading{align-items:flex-start;flex-direction:column}}
