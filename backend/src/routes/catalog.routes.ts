@@ -64,6 +64,25 @@ router.post("/categories", async (request, response, next) => {
   }
 });
 
+
+router.patch("/categories/:categoryId", async (request, response, next) => {
+  try {
+    const { name } = request.body ?? {};
+    if (!textField(name, 80)) { response.status(400).json({ error: "Category name must contain 1 to 80 characters." }); return; }
+    const category = await prisma.category.update({ where: { id: request.params.categoryId }, data: { name: name.trim() } });
+    response.json({ category });
+  } catch (error) { if (handleUniqueError(error, response)) return; next(error); }
+});
+router.delete("/categories/:categoryId", async (request, response, next) => {
+  try {
+    const category = await prisma.category.findUnique({ where: { id: request.params.categoryId }, include: { _count: { select: { products: true, children: true } } } });
+    if (!category) { response.status(404).json({ error: "Category not found." }); return; }
+    if (category._count.products || category._count.children) { response.status(409).json({ error: "This category is in use. Move its products and child categories before deleting it." }); return; }
+    await prisma.category.delete({ where: { id: category.id } });
+    response.status(204).end();
+  } catch (error) { next(error); }
+});
+
 // Supermarket directory
 router.get("/supermarkets", async (_request, response, next) => {
   try {
@@ -105,6 +124,26 @@ router.post("/supermarkets", async (request, response, next) => {
     if (handleUniqueError(error, response)) return;
     next(error);
   }
+});
+
+
+router.patch("/supermarkets/:supermarketId", async (request, response, next) => {
+  try {
+    const { name, chain, website } = request.body ?? {};
+    if (!textField(name, 100) || (chain !== undefined && chain !== null && (typeof chain !== "string" || chain.trim().length > 100)) || (website !== undefined && website !== null && (typeof website !== "string" || website.trim().length > 300))) { response.status(400).json({ error: "Provide a valid name, chain and website." }); return; }
+    if (website && !/^https?:\/\//i.test(website)) { response.status(400).json({ error: "Website must start with http:// or https://." }); return; }
+    const supermarket = await prisma.supermarket.update({ where: { id: request.params.supermarketId }, data: { name: name.trim(), chain: typeof chain === "string" && chain.trim() ? chain.trim() : null, website: typeof website === "string" && website.trim() ? website.trim() : null } });
+    response.json({ supermarket });
+  } catch (error) { if (handleUniqueError(error, response)) return; next(error); }
+});
+router.delete("/supermarkets/:supermarketId", async (request, response, next) => {
+  try {
+    const supermarket = await prisma.supermarket.findUnique({ where: { id: request.params.supermarketId }, include: { _count: { select: { offers: true, prices: true } } } });
+    if (!supermarket) { response.status(404).json({ error: "Supermarket not found." }); return; }
+    if (supermarket._count.offers || supermarket._count.prices) { response.status(409).json({ error: "This supermarket has offers or price history. Remove those records before deleting it." }); return; }
+    await prisma.supermarket.delete({ where: { id: supermarket.id } });
+    response.status(204).end();
+  } catch (error) { next(error); }
 });
 
 // Product catalogue
@@ -202,6 +241,37 @@ router.post("/products", async (request, response, next) => {
     if (handleUniqueError(error, response)) return;
     next(error);
   }
+});
+
+
+router.patch("/products/:productId", async (request, response, next) => {
+  try {
+    const { name, brand, barcode, description, categoryId, unit, quantity } = request.body ?? {};
+    if (!textField(name, 150) || !textField(categoryId, 64) ||
+      (brand !== undefined && brand !== null && (typeof brand !== "string" || brand.trim().length > 100)) ||
+      (barcode !== undefined && barcode !== null && (typeof barcode !== "string" || barcode.trim().length > 64)) ||
+      (description !== undefined && description !== null && (typeof description !== "string" || description.length > 1000)) ||
+      (unit !== undefined && unit !== null && (typeof unit !== "string" || unit.trim().length > 30))) { response.status(400).json({ error: "Provide a product name and valid category and optional details." }); return; }
+    const category = await prisma.category.findUnique({ where: { id: categoryId }, select: { id: true } });
+    if (!category) { response.status(404).json({ error: "Category not found." }); return; }
+    let parsedQuantity: Prisma.Decimal | null = null;
+    if (quantity !== undefined && quantity !== null && quantity !== "") {
+      const n = Number(quantity);
+      if (!Number.isFinite(n) || n <= 0 || n > 9999999.999 || !Number.isInteger(n * 1000)) { response.status(400).json({ error: "Quantity must be positive with up to 3 decimal places." }); return; }
+      parsedQuantity = new Prisma.Decimal(n);
+    }
+    const product = await prisma.product.update({ where: { id: request.params.productId }, data: { name: name.trim(), brand: typeof brand === "string" && brand.trim() ? brand.trim() : null, barcode: typeof barcode === "string" && barcode.trim() ? barcode.trim() : null, description: typeof description === "string" && description.trim() ? description.trim() : null, categoryId, unit: typeof unit === "string" && unit.trim() ? unit.trim() : null, quantity: parsedQuantity }, include: { category: { select: { id: true, name: true } } } });
+    response.json({ product });
+  } catch (error) { if (handleUniqueError(error, response)) return; next(error); }
+});
+router.delete("/products/:productId", async (request, response, next) => {
+  try {
+    const product = await prisma.product.findUnique({ where: { id: request.params.productId }, include: { _count: { select: { priceObservations: true, listItems: true, supermarketOffers: true } } } });
+    if (!product) { response.status(404).json({ error: "Product not found." }); return; }
+    if (product._count.priceObservations || product._count.listItems || product._count.supermarketOffers) { response.status(409).json({ error: "This product is referenced by shopping lists, supermarket offers or price history. Remove those records before deleting it." }); return; }
+    await prisma.product.delete({ where: { id: product.id } });
+    response.status(204).end();
+  } catch (error) { next(error); }
 });
 
 // Latest recorded prices for a product, grouped by supermarket in the response.
