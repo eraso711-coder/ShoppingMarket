@@ -67,9 +67,28 @@ router.post("/categories", async (request, response, next) => {
 
 router.patch("/categories/:categoryId", async (request, response, next) => {
   try {
-    const { name } = request.body ?? {};
-    if (!textField(name, 80)) { response.status(400).json({ error: "Category name must contain 1 to 80 characters." }); return; }
-    const category = await prisma.category.update({ where: { id: request.params.categoryId }, data: { name: name.trim() } });
+    const { name, parentId } = request.body ?? {};
+    if (!textField(name, 80) || (parentId !== undefined && parentId !== null && typeof parentId !== "string")) {
+      response.status(400).json({ error: "Provide a valid category name and optional parent category." }); return;
+    }
+    const categoryId = request.params.categoryId;
+    const existing = await prisma.category.findUnique({ where: { id: categoryId }, select: { id: true } });
+    if (!existing) { response.status(404).json({ error: "Category not found." }); return; }
+    if (parentId !== undefined && parentId !== null) {
+      if (parentId === categoryId) { response.status(400).json({ error: "A category cannot be its own parent." }); return; }
+      const allCategories = await prisma.category.findMany({ select: { id: true, parentId: true } });
+      const parents = new Map(allCategories.map((entry) => [entry.id, entry.parentId]));
+      let ancestor: string | null = parentId;
+      while (ancestor) {
+        if (ancestor === categoryId) { response.status(400).json({ error: "This parent would create a category cycle." }); return; }
+        ancestor = parents.get(ancestor) ?? null;
+      }
+      if (!parents.has(parentId)) { response.status(404).json({ error: "Parent category not found." }); return; }
+    }
+    const category = await prisma.category.update({
+      where: { id: categoryId },
+      data: { name: name.trim(), ...(parentId !== undefined ? { parentId } : {}) }
+    });
     response.json({ category });
   } catch (error) { if (handleUniqueError(error, response)) return; next(error); }
 });
