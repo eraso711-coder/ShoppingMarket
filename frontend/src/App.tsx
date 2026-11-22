@@ -641,7 +641,7 @@ function App() {
           </div>
           {catalogLoading ? <div className="empty-dashboard">Loading catalogue…</div> : visibleCatalogProducts.length ? <div className="product-directory">{visibleCatalogProducts.map((product) => <article className={expandedPriceProductId === product.id ? "product-row expanded" : "product-row"} key={product.id}>
             <div className="product-row-main">
-              <div className="product-row-identity"><span className="product-category">{product.category?.name ?? "Uncategorised"}</span><h3>{product.name}</h3><p>{product.brand ?? "No brand"}{product.unit ? ` · ${product.unit}` : ""}</p></div>
+              <div className="product-row-identity"><span className="product-category">{product.category?.name ?? "Uncategorised"}</span><h3>{product.name}</h3><p>{product.brand ?? "No brand"}{product.unit ? ` · ${product.unit}` : ""}{product.quantity ? ` · ${product.quantity} ${product.unit ?? "units"}` : ""}</p></div>
               <div className="product-row-summary"><span>{product.priceObservations.length} {product.priceObservations.length === 1 ? "supermarket price" : "supermarket prices"}</span><strong>{product.priceObservations.length ? `${product.priceObservations.length} recorded` : "No prices yet"}</strong></div>
               <div className="product-row-actions">
                 <button className="primary-action" type="button" onClick={() => setExpandedPriceProductId(expandedPriceProductId === product.id ? null : product.id)}>{expandedPriceProductId === product.id ? "Hide prices" : "Manage prices"}</button>
