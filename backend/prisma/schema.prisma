@@ -127,7 +127,7 @@ model PriceObservation {
   productId     String @map("product_id") @db.Uuid
   supermarketId String @map("supermarket_id") @db.Uuid
   price         Decimal @db.Decimal(10,2)
-  currency      String @default("EUR") @db.VarChar(3)
+  currency      String @default("COP") @db.VarChar(3)
   observedAt    DateTime @default(now()) @map("observed_at")
   source        String?
   product       Product @relation(fields:[productId],references:[id],onDelete:Cascade)
