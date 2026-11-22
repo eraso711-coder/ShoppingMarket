@@ -392,50 +392,24 @@ function App() {
 
   async function saveInlineEdit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!token || !editingEntity) return;
-    setSavingEdit(true);
-    setCatalogError("");
-    setError("");
+    if (!token || editingEntity?.type !== "list") return;
+    setSavingEdit(true); setError("");
     try {
-      const { type, id } = editingEntity;
-      if (type === "category") {
-        await apiRequest(`/catalog/categories/${id}`, token, { method: "PATCH", body: JSON.stringify({ name: editValues.name, parentId: editValues.parentId || null }) });
-        const data = await apiRequest<{ categories: CatalogCategory[] }>("/catalog/categories", token);
-        setCatalogCategories(data.categories);
-      } else if (type === "supermarket") {
-        await apiRequest(`/catalog/supermarkets/${id}`, token, { method: "PATCH", body: JSON.stringify({ name: editValues.name, chain: editValues.chain || null, website: editValues.website || null }) });
-        const data = await apiRequest<{ supermarkets: Supermarket[] }>("/catalog/supermarkets", token);
-        setSupermarkets(data.supermarkets);
-      } else if (type === "product") {
-        await apiRequest(`/catalog/products/${id}`, token, { method: "PATCH", body: JSON.stringify({
-          name: editValues.name, brand: editValues.brand || null, barcode: editValues.barcode || null,
-          description: editValues.description || null, categoryId: editValues.categoryId,
-          unit: editValues.unit || null, quantity: editValues.quantity.trim() ? Number(editValues.quantity) : null
-        }) });
-        const data = await apiRequest<{ products: CatalogProduct[] }>(`/catalog/products?q=${encodeURIComponent(catalogQuery)}`, token);
-        setCatalogProducts(data.products);
-      } else if (type === "price") {
-        await apiRequest(`/catalog/prices/${id}`, token, { method: "PATCH", body: JSON.stringify({
-          price: Number(editValues.price), currency: editValues.currency.trim().toUpperCase(),
-          observedAt: new Date(editValues.observedAt).toISOString(), source: editValues.source || null
-        }) });
-        const data = await apiRequest<{ products: CatalogProduct[] }>(`/catalog/products?q=${encodeURIComponent(catalogQuery)}`, token);
-        setCatalogProducts(data.products);
-      } else if (type === "list") {
-        await apiRequest(`/shopping-lists/${id}`, token, { method: "PATCH", body: JSON.stringify({
-          name: editValues.name, status: editValues.status, dueAt: editValues.dueAt ? new Date(editValues.dueAt).toISOString() : null
-        }) });
-        await refreshLists(token);
-      }
+      await apiRequest(`/shopping-lists/${editingEntity.id}`, token, {
+        method: "PATCH",
+        body: JSON.stringify({
+          name: editValues.name,
+          status: editValues.status,
+          dueAt: editValues.dueAt ? new Date(editValues.dueAt).toISOString() : null
+        })
+      });
       cancelEdit();
+      await refreshLists(token);
     } catch (requestError) {
-      const message = requestError instanceof Error ? requestError.message : "Unable to save these changes.";
-      if (editingEntity?.type === "list") setError(message);
-      else setCatalogError(message);
-    } finally {
-      setSavingEdit(false);
-    }
+      setError(requestError instanceof Error ? requestError.message : "Unable to save this list.");
+    } finally { setSavingEdit(false); }
   }
+
 
   function clearCatalogueFormValues() {
     setCategoryName("");
