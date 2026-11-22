@@ -6,8 +6,8 @@ type User = { id: string; email: string; firstName: string; lastName: string };
 type Family = { id: string; name: string; role: string } | null;
 type Profile = { user: User; family: Family };
 type ProductSummary = { id: string; name: string; brand: string | null } | null;
-type CatalogProduct = { id: string; name: string; brand: string | null; barcode: string | null; description: string | null; categoryId: string | null; quantity: string | null; unit: string | null; category: { id: string; name: string } | null; priceObservations: { id: string; price: string; currency: string; observedAt: string; source: string | null; supermarket: { id: string; name: string; chain: string | null } }[] };
-type CatalogCategory = { id: string; name: string; parentId?: string | null; _count?: { products: number } };
+type CatalogProduct = { id: string; name: string; brand: string | null; barcode: string | null; description: string | null; categoryId: string | null; quantity: string | null; unit: string | null; category: { id: string; name: string } | null; priceObservations: { id: string; productId: string; price: string; currency: string; observedAt: string; source: string | null; supermarket: { id: string; name: string; chain: string | null } }[] };
+type CatalogCategory = { id: string; name: string; _count?: { products: number } };
 type Supermarket = { id: string; name: string; chain: string | null; website: string | null; _count?: { offers: number; prices: number } };
 type Item = {
   id: string;
@@ -153,7 +153,6 @@ function App() {
   const [catalogProducts, setCatalogProducts] = useState<CatalogProduct[]>([]);
   const [catalogCategories, setCatalogCategories] = useState<CatalogCategory[]>([]);
   const [categoryName, setCategoryName] = useState("");
-  const [categoryParentId, setCategoryParentId] = useState("");
   const [creatingCategory, setCreatingCategory] = useState(false);
   const [supermarkets, setSupermarkets] = useState<Supermarket[]>([]);
   const [catalogLoading, setCatalogLoading] = useState(false);
@@ -348,58 +347,30 @@ function App() {
     return () => { cancelled = true; };
   }, [token, activeView, catalogQuery]);
 
-  async function createCatalogProduct(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (!token) return;
-    setCreatingProduct(true);
-    setCatalogError("");
-    try {
-      await apiRequest("/catalog/products", token, {
-        method: "POST",
-        body: JSON.stringify({ name: productName, brand: productBrand || null, barcode: productBarcode || null, description: productDescription || null, categoryId: productCategoryId || null, unit: productUnit || null, quantity: productQuantity === "" ? null : Number(productQuantity) })
-      });
-      setProductName(""); setProductBrand(""); setProductBarcode(""); setProductDescription(""); setProductCategoryId(""); setProductUnit(""); setProductQuantity("");
-      const refreshed = await apiRequest<{ products: CatalogProduct[] }>(`/catalog/products?q=${encodeURIComponent(catalogQuery)}`, token);
-      setCatalogProducts(refreshed.products);
-    } catch (requestError) {
-      setCatalogError(requestError instanceof Error ? requestError.message : "Unable to create the product.");
-    } finally { setCreatingProduct(false); }
+  async function saveCatalogProduct(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault(); if (!token) return; setCreatingProduct(true); setCatalogError("");
+    try { const body=JSON.stringify({name:productName,brand:productBrand||null,barcode:productBarcode||null,description:productDescription||null,categoryId:productCategoryId||null,unit:productUnit||null,quantity:productQuantity===""?null:Number(productQuantity)});
+      if(editingEntity?.type==="product") await apiRequest(`/catalog/products/${editingEntity.id}`,token,{method:"PATCH",body}); else await apiRequest("/catalog/products",token,{method:"POST",body});
+      setProductName("");setProductBrand("");setProductBarcode("");setProductDescription("");setProductCategoryId("");setProductUnit("");setProductQuantity("");setEditingEntity(null);
+      const data=await apiRequest<{products:CatalogProduct[]}>(`/catalog/products?q=${encodeURIComponent(catalogQuery)}`,token);setCatalogProducts(data.products);
+    } catch(e){setCatalogError(e instanceof Error?e.message:"Unable to save the product.");}finally{setCreatingProduct(false);}
   }
 
-  async function createCategory(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (!token) return;
-    setCreatingCategory(true);
-    setCatalogError("");
-    try {
-      const data = await apiRequest<{ category: CatalogCategory }>("/catalog/categories", token, {
-        method: "POST",
-        body: JSON.stringify({ name: categoryName, parentId: categoryParentId || null })
-      });
-      setCatalogCategories((current) => [...current, data.category].sort((a, b) => a.name.localeCompare(b.name)));
-      setProductCategoryId(data.category.id);
-      setCategoryName(""); setCategoryParentId("");
-    } catch (requestError) {
-      setCatalogError(requestError instanceof Error ? requestError.message : "Unable to create the category.");
-    } finally { setCreatingCategory(false); }
+  async function saveCategory(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();if(!token)return;setCreatingCategory(true);setCatalogError("");
+    try { if(editingEntity?.type==="category") await apiRequest(`/catalog/categories/${editingEntity.id}`,token,{method:"PATCH",body:JSON.stringify({name:categoryName})});
+      else {const result=await apiRequest<{category:CatalogCategory}>("/catalog/categories",token,{method:"POST",body:JSON.stringify({name:categoryName})});setProductCategoryId(result.category.id);}
+      const data=await apiRequest<{categories:CatalogCategory[]}>("/catalog/categories",token);setCatalogCategories(data.categories);setCategoryName("");setEditingEntity(null);
+    }catch(e){setCatalogError(e instanceof Error?e.message:"Unable to save the category.");}finally{setCreatingCategory(false);}
   }
 
-  async function createSupermarket(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (!token) return;
-    setCreatingSupermarket(true);
-    setCatalogError("");
-    try {
-      const data = await apiRequest<{ supermarket: Supermarket }>("/catalog/supermarkets", token, {
-        method: "POST",
-        body: JSON.stringify({ name: supermarketName, chain: supermarketChain || null, website: supermarketWebsite || null })
-      });
-      setSupermarkets((current) => [...current, data.supermarket].sort((a, b) => a.name.localeCompare(b.name)));
-      setPriceSupermarketId(data.supermarket.id);
-      setSupermarketName(""); setSupermarketChain(""); setSupermarketWebsite("");
-    } catch (requestError) {
-      setCatalogError(requestError instanceof Error ? requestError.message : "Unable to create the supermarket.");
-    } finally { setCreatingSupermarket(false); }
+  async function saveSupermarket(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();if(!token)return;setCreatingSupermarket(true);setCatalogError("");
+    try {const body=JSON.stringify({name:supermarketName,chain:supermarketChain||null,website:supermarketWebsite||null});
+      if(editingEntity?.type==="supermarket") await apiRequest(`/catalog/supermarkets/${editingEntity.id}`,token,{method:"PATCH",body});
+      else {const result=await apiRequest<{supermarket:Supermarket}>("/catalog/supermarkets",token,{method:"POST",body});setPriceSupermarketId(result.supermarket.id);}
+      const data=await apiRequest<{supermarkets:Supermarket[]}>("/catalog/supermarkets",token);setSupermarkets(data.supermarkets);setSupermarketName("");setSupermarketChain("");setSupermarketWebsite("");setEditingEntity(null);
+    }catch(e){setCatalogError(e instanceof Error?e.message:"Unable to save the supermarket.");}finally{setCreatingSupermarket(false);}
   }
 
 
@@ -469,7 +440,7 @@ function App() {
   async function manageCategory(category: CatalogCategory, action: "edit" | "delete") {
     if (!token) return;
     if (action === "edit") {
-      beginEdit("category", category.id, { name: category.name, parentId: category.parentId ?? "" });
+      setEditingEntity({type:"category",id:category.id});setCategoryName(category.name);setCatalogError("");
       return;
     }
     if (!window.confirm(`Delete category "${category.name}"?`)) return;
@@ -486,7 +457,7 @@ function App() {
   async function manageSupermarket(supermarket: Supermarket, action: "edit" | "delete") {
     if (!token) return;
     if (action === "edit") {
-      beginEdit("supermarket", supermarket.id, { name: supermarket.name, chain: supermarket.chain ?? "", website: supermarket.website ?? "" });
+      setEditingEntity({type:"supermarket",id:supermarket.id});setSupermarketName(supermarket.name);setSupermarketChain(supermarket.chain??"");setSupermarketWebsite(supermarket.website??"");setCatalogError("");
       return;
     }
     if (!window.confirm(`Delete supermarket "${supermarket.name}"? This is only possible when it has no offers or price history.`)) return;
@@ -503,11 +474,7 @@ function App() {
   async function manageProduct(product: CatalogProduct, action: "edit" | "delete") {
     if (!token) return;
     if (action === "edit") {
-      beginEdit("product", product.id, {
-        name: product.name, brand: product.brand ?? "", barcode: product.barcode ?? "",
-        description: product.description ?? "", categoryId: product.categoryId ?? product.category?.id ?? "",
-        unit: product.unit ?? "", quantity: product.quantity ?? ""
-      });
+      setEditingEntity({type:"product",id:product.id});setProductName(product.name);setProductBrand(product.brand??"");setProductBarcode(product.barcode??"");setProductDescription(product.description??"");setProductCategoryId(product.categoryId??product.category?.id??"");setProductUnit(product.unit??"");setProductQuantity(product.quantity??"");setCatalogError("");
       return;
     }
     if (!window.confirm(`Delete product "${product.name}"? Products used in lists or price history cannot be deleted.`)) return;
@@ -523,11 +490,7 @@ function App() {
   async function managePrice(observation: CatalogProduct["priceObservations"][number], action: "edit" | "delete") {
     if (!token) return;
     if (action === "edit") {
-      beginEdit("price", observation.id, {
-        price: observation.price, currency: observation.currency,
-        observedAt: new Date(observation.observedAt).toISOString().slice(0, 16),
-        source: observation.source ?? ""
-      });
+      setEditingEntity({type:"price",id:observation.id});setPriceProductId(observation.productId);setPriceValue(observation.price);setPriceCurrency(observation.currency);setPriceSupermarketId(observation.supermarket.id);setCatalogError("");
       return;
     }
     if (!window.confirm(`Delete the ${observation.price} ${observation.currency} price at ${observation.supermarket.name}?`)) return;
@@ -541,21 +504,12 @@ function App() {
   }
 
   async function savePrice(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (!token || !priceProductId || !priceSupermarketId) return;
-    setSavingPrice(true);
-    setCatalogError("");
-    try {
-      await apiRequest(`/catalog/products/${priceProductId}/prices`, token, {
-        method: "POST",
-        body: JSON.stringify({ supermarketId: priceSupermarketId, price: Number(priceValue), currency: priceCurrency, source: "manual-entry" })
-      });
-      setPriceProductId(null); setPriceValue(""); setPriceCurrency("COP");
-      const data = await apiRequest<{ products: CatalogProduct[] }>(`/catalog/products?q=${encodeURIComponent(catalogQuery)}`, token);
-      setCatalogProducts(data.products);
-    } catch (requestError) {
-      setCatalogError(requestError instanceof Error ? requestError.message : "Unable to save this price.");
-    } finally { setSavingPrice(false); }
+    event.preventDefault();if(!token||!priceProductId||!priceSupermarketId)return;setSavingPrice(true);setCatalogError("");
+    try {if(editingEntity?.type==="price") await apiRequest(`/catalog/prices/${editingEntity.id}`,token,{method:"PATCH",body:JSON.stringify({price:Number(priceValue),currency:priceCurrency,supermarketId:priceSupermarketId})});
+      else await apiRequest(`/catalog/products/${priceProductId}/prices`,token,{method:"POST",body:JSON.stringify({supermarketId:priceSupermarketId,price:Number(priceValue),currency:priceCurrency,source:"manual-entry"})});
+      setPriceProductId(null);setPriceValue("");setPriceCurrency("COP");setEditingEntity(null);
+      const data=await apiRequest<{products:CatalogProduct[]}>(`/catalog/products?q=${encodeURIComponent(catalogQuery)}`,token);setCatalogProducts(data.products);
+    }catch(e){setCatalogError(e instanceof Error?e.message:"Unable to save this price.");}finally{setSavingPrice(false);}
   }
 
   async function addCatalogueProductToList(product: CatalogProduct) {
@@ -648,48 +602,40 @@ function App() {
           {catalogError && <div className="global-error" role="alert">{catalogError}<button onClick={() => setCatalogError("")}>×</button></div>}
           <section className="category-manager" aria-labelledby="category-manager-title">
             <div className="category-manager-heading"><div><span className="preview-kicker">STEP 1 · ORGANISE YOUR CATALOGUE</span><h3 id="category-manager-title">Product categories</h3><p>Create your categories first. Every catalogue product must belong to one.</p></div><span className="category-count">{catalogCategories.length} {catalogCategories.length === 1 ? "category" : "categories"}</span></div>
-            <form className="category-create-form" onSubmit={createCategory}>
+            <form className="category-create-form" onSubmit={saveCategory}>
               <label className="sr-only" htmlFor="new-category-name">New category name</label>
               <input id="new-category-name" value={categoryName} onChange={(event) => setCategoryName(event.target.value)} placeholder="Enter a category name, e.g. Dairy" maxLength={80} required />
-              <select aria-label="Parent category (optional)" value={categoryParentId} onChange={(event) => setCategoryParentId(event.target.value)}><option value="">No parent category</option>{catalogCategories.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}</select>
-              <button className="primary-action" type="submit" disabled={creatingCategory || !categoryName.trim()}>{creatingCategory ? "Creating…" : "＋ Add category"}</button>
+              
+              <button className="primary-action" type="submit" disabled={creatingCategory || !categoryName.trim()}>{creatingCategory ? "Saving…" : editingEntity?.type === "category" ? "Save changes" : "＋ Add category"}</button>
+              {editingEntity?.type === "category" && <button type="button" className="secondary-action" onClick={() => {setEditingEntity(null);setCategoryName("");}}>Cancel</button>}
             </form>
             <div className="category-list" aria-live="polite">
-              {catalogCategories.length ? catalogCategories.map((category) => <div className="category-edit-card" key={category.id}>
-                {editingEntity?.type === "category" && editingEntity.id === category.id ? <form className="inline-edit-form category-inline-edit" onSubmit={saveInlineEdit}>
-                  <input aria-label="Category name" value={editValues.name ?? ""} onChange={(event) => updateEditField("name", event.target.value)} placeholder="Category name" maxLength={80} required />
-                  <select aria-label="Parent category" value={editValues.parentId ?? ""} onChange={(event) => updateEditField("parentId", event.target.value)}><option value="">No parent category</option>{catalogCategories.filter((entry) => entry.id !== category.id).map((entry) => <option key={entry.id} value={entry.id}>{entry.name}</option>)}</select>
-                  <button className="primary-action" type="submit" disabled={savingEdit}>{savingEdit ? "Saving…" : "Save"}</button><button className="secondary-action" type="button" onClick={cancelEdit}>Cancel</button>
-                </form> : <><span className={productCategoryId === category.id ? "category-chip selected" : "category-chip"}>{category.name}{category.parentId ? ` · ${catalogCategories.find((entry) => entry.id === category.parentId)?.name ?? "Subcategory"}` : ""}{productCategoryId === category.id ? " ✓" : ""}</span><button type="button" onClick={() => manageCategory(category, "edit")}>Edit</button><button type="button" onClick={() => manageCategory(category, "delete")}>Delete</button></>}
-              </div>) : <p className="category-empty">No categories yet. Add your first category above to get started.</p>}
+              {catalogCategories.length ? catalogCategories.map((category) => <div className="category-edit-card" key={category.id}><span className={productCategoryId===category.id?"category-chip selected":"category-chip"}>{category.name}{productCategoryId===category.id?" ✓":""}</span><button type="button" onClick={()=>manageCategory(category,"edit")}>Edit</button><button type="button" onClick={()=>manageCategory(category,"delete")}>Delete</button></div>) : <p className="category-empty">No categories yet. Add your first category above to get started.</p>}
             </div>
           </section>
           <div className="catalog-tools">
             <form className="catalog-search" onSubmit={(event) => event.preventDefault()}><input value={catalogQuery} onChange={(event) => setCatalogQuery(event.target.value)} placeholder="Search by product, brand or barcode…" /><span>⌕</span></form>
-            <form className="catalog-create-form" onSubmit={createCatalogProduct}>
-              <div className="catalog-form-title"><span className="preview-kicker">ADD TO CATALOGUE</span><strong>New product</strong></div>
+            <form className="catalog-create-form" onSubmit={saveCatalogProduct}>
+              <div className="catalog-form-title"><span className="preview-kicker">ADD TO CATALOGUE</span><strong>{editingEntity?.type === "product" ? "Edit product" : "New product"}</strong></div>
               <input value={productName} onChange={(event) => setProductName(event.target.value)} placeholder="Product name" maxLength={150} required />
               <input value={productBrand} onChange={(event) => setProductBrand(event.target.value)} placeholder="Brand (optional)" maxLength={100} />
               <input value={productBarcode} onChange={(event) => setProductBarcode(event.target.value)} placeholder="Barcode (optional)" maxLength={64} />
               <textarea value={productDescription} onChange={(event) => setProductDescription(event.target.value)} placeholder="Description (optional)" maxLength={1000} rows={2} />
               <select value={productCategoryId} onChange={(event) => setProductCategoryId(event.target.value)} required disabled={catalogCategories.length === 0}><option value="">Choose a category *</option>{catalogCategories.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}</select>
-              <div className="catalog-form-row"><input value={productUnit} onChange={(event) => setProductUnit(event.target.value)} placeholder="Unit (e.g. bottle, pack)" maxLength={30} /><input type="number" min="0.001" max="9999999.999" step="0.001" value={productQuantity} onChange={(event) => setProductQuantity(event.target.value)} placeholder="Pack quantity" /><button className="primary-action" type="submit" disabled={creatingProduct || !productName.trim() || !productCategoryId}>{creatingProduct ? "Saving…" : "Add product"}</button></div>
+              <div className="catalog-form-row"><input value={productUnit} onChange={(event) => setProductUnit(event.target.value)} placeholder="Unit (e.g. bottle, pack)" maxLength={30} /><input type="number" min="0.001" max="9999999.999" step="0.001" value={productQuantity} onChange={(event) => setProductQuantity(event.target.value)} placeholder="Pack quantity" /><button className="primary-action" type="submit" disabled={creatingProduct || !productName.trim() || !productCategoryId}>{creatingProduct ? "Saving…" : editingEntity?.type === "product" ? "Save changes" : "Add product"}</button></div>
+              {editingEntity?.type === "product" && <button type="button" className="secondary-action" onClick={() => {setEditingEntity(null);setProductName("");setProductBrand("");setProductBarcode("");setProductDescription("");setProductCategoryId("");setProductUnit("");setProductQuantity("");}}>Cancel</button>}
               {catalogCategories.length === 0 && <p className="catalog-form-hint">Create your first category above before adding products.</p>}
             </form>
             <section className="catalog-create-form supermarket-form">
-              <div className="catalog-form-title"><span className="preview-kicker">PRICE SOURCES</span><strong>Supermarkets</strong></div>
-              <form className="supermarket-create-fields" onSubmit={createSupermarket}>
+              <div className="catalog-form-title"><span className="preview-kicker">PRICE SOURCES</span><strong>{editingEntity?.type === "supermarket" ? "Edit supermarket" : "Supermarkets"}</strong></div>
+              <form className="supermarket-create-fields" onSubmit={saveSupermarket}>
               <div className="catalog-form-row"><input value={supermarketName} onChange={(event) => setSupermarketName(event.target.value)} placeholder="Supermarket name" maxLength={100} required /><input value={supermarketChain} onChange={(event) => setSupermarketChain(event.target.value)} placeholder="Chain (optional)" maxLength={100} /></div>
               <input type="url" value={supermarketWebsite} onChange={(event) => setSupermarketWebsite(event.target.value)} placeholder="Website URL (optional, https://…)" maxLength={300} />
-              <button className="secondary-action" type="submit" disabled={creatingSupermarket || !supermarketName.trim()}>{creatingSupermarket ? "Saving…" : "Add supermarket"}</button>
+              <button className="secondary-action" type="submit" disabled={creatingSupermarket || !supermarketName.trim()}>{creatingSupermarket ? "Saving…" : editingEntity?.type === "supermarket" ? "Save changes" : "Add supermarket"}</button>
+                {editingEntity?.type === "supermarket" && <button type="button" className="secondary-action" onClick={() => {setEditingEntity(null);setSupermarketName("");setSupermarketChain("");setSupermarketWebsite("");}}>Cancel</button>}
               </form>
               <p>{supermarkets.length} supermarket{supermarkets.length === 1 ? "" : "s"} in your directory</p><div className="directory-list">{supermarkets.map((market) => <div className="directory-entry" key={market.id}>
-                {editingEntity?.type === "supermarket" && editingEntity.id === market.id ? <form className="inline-edit-form supermarket-inline-edit" onSubmit={saveInlineEdit}>
-                  <input aria-label="Supermarket name" value={editValues.name ?? ""} onChange={(event) => updateEditField("name", event.target.value)} placeholder="Supermarket name" maxLength={100} required />
-                  <input aria-label="Chain" value={editValues.chain ?? ""} onChange={(event) => updateEditField("chain", event.target.value)} placeholder="Chain (optional)" maxLength={100} />
-                  <input aria-label="Website" type="url" value={editValues.website ?? ""} onChange={(event) => updateEditField("website", event.target.value)} placeholder="Website URL (optional)" maxLength={300} />
-                  <button className="primary-action" type="submit" disabled={savingEdit}>{savingEdit ? "Saving…" : "Save"}</button><button className="secondary-action" type="button" onClick={cancelEdit}>Cancel</button>
-                </form> : <><span><strong>{market.name}</strong>{market.chain ? ` · ${market.chain}` : ""}{market.website ? <a href={market.website} target="_blank" rel="noreferrer"> · Website</a> : ""}</span><span><button type="button" onClick={() => manageSupermarket(market, "edit")}>Edit</button><button type="button" onClick={() => manageSupermarket(market, "delete")}>Delete</button></span></>}
+<span><strong>{market.name}</strong>{market.chain?` · ${market.chain}`:""}{market.website?<a href={market.website} target="_blank" rel="noreferrer"> · Website</a>:""}</span><span><button type="button" onClick={()=>manageSupermarket(market,"edit")}>Edit</button><button type="button" onClick={()=>manageSupermarket(market,"delete")}>Delete</button></span>
               </div>)}</div>
             </section>
           </div>
@@ -699,40 +645,14 @@ function App() {
           </div>
           {catalogLoading ? <div className="empty-dashboard">Loading catalogue…</div> : visibleCatalogProducts.length ? <div className="product-directory">{visibleCatalogProducts.map((product) => <article className={expandedPriceProductId === product.id ? "product-row expanded" : "product-row"} key={product.id}>
             <div className="product-row-main">
-              {editingEntity?.type === "product" && editingEntity.id === product.id ? <form className="inline-edit-form product-inline-edit" onSubmit={saveInlineEdit}>
-                <div className="inline-edit-grid">
-                  <input aria-label="Product name" value={editValues.name ?? ""} onChange={(event) => updateEditField("name", event.target.value)} placeholder="Product name" maxLength={150} required />
-                  <input aria-label="Brand" value={editValues.brand ?? ""} onChange={(event) => updateEditField("brand", event.target.value)} placeholder="Brand (optional)" maxLength={100} />
-                  <input aria-label="Barcode" value={editValues.barcode ?? ""} onChange={(event) => updateEditField("barcode", event.target.value)} placeholder="Barcode (optional)" maxLength={64} />
-                  <select aria-label="Category" value={editValues.categoryId ?? ""} onChange={(event) => updateEditField("categoryId", event.target.value)} required><option value="">Choose category</option>{catalogCategories.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}</select>
-                  <input aria-label="Unit" value={editValues.unit ?? ""} onChange={(event) => updateEditField("unit", event.target.value)} placeholder="Unit (e.g. bottle, pack)" maxLength={30} />
-                  <input aria-label="Pack quantity" type="number" min="0.001" max="9999999.999" step="0.001" value={editValues.quantity ?? ""} onChange={(event) => updateEditField("quantity", event.target.value)} placeholder="Pack quantity" />
-                  <textarea aria-label="Description" value={editValues.description ?? ""} onChange={(event) => updateEditField("description", event.target.value)} placeholder="Description (optional)" maxLength={1000} rows={2} />
-                </div>
-                <div className="inline-edit-actions"><button className="primary-action" type="submit" disabled={savingEdit || !editValues.name?.trim() || !editValues.categoryId}>{savingEdit ? "Saving…" : "Save changes"}</button><button className="secondary-action" type="button" onClick={cancelEdit}>Cancel</button></div>
-              </form> : <>
-                <div className="product-row-identity"><span className="product-category">{product.category?.name ?? "Uncategorised"}</span><h3>{product.name}</h3><p>{product.brand ?? "No brand"}{product.unit ? ` · ${product.unit}` : ""}{product.quantity ? ` · ${product.quantity} ${product.unit ?? "units"}` : ""}</p></div>
-                <div className="product-row-summary"><span>{product.priceObservations.length} {product.priceObservations.length === 1 ? "supermarket price" : "supermarket prices"}</span><strong>{product.priceObservations.length ? `${product.priceObservations.length} recorded` : "No prices yet"}</strong></div>
-                <div className="product-row-actions">
-                  <button className="primary-action" type="button" onClick={() => setExpandedPriceProductId(expandedPriceProductId === product.id ? null : product.id)}>{expandedPriceProductId === product.id ? "Hide prices" : "Manage prices"}</button>
-                  <button className="secondary-action" type="button" onClick={() => manageProduct(product, "edit")}>Edit</button>
-                  <button className="secondary-action" type="button" onClick={() => manageProduct(product, "delete")}>Delete</button>
-                  {selectedListId && <button className="secondary-action" type="button" onClick={() => addCatalogueProductToList(product)}>Add to list</button>}
-                </div>
-              </>}
+              <div className="product-row-identity"><span className="product-category">{product.category?.name??"Uncategorised"}</span><h3>{product.name}</h3><p>{product.brand??"No brand"}{product.unit?` · ${product.unit}`:""}{product.quantity?` · ${product.quantity} ${product.unit??"units"}`:""}</p></div><div className="product-row-summary"><span>{product.priceObservations.length} {product.priceObservations.length===1?"supermarket price":"supermarket prices"}</span><strong>{product.priceObservations.length?`${product.priceObservations.length} recorded`:"No prices yet"}</strong></div><div className="product-row-actions"><button className="primary-action" type="button" onClick={()=>setExpandedPriceProductId(expandedPriceProductId===product.id?null:product.id)}>{expandedPriceProductId===product.id?"Hide prices":"Manage prices"}</button><button className="secondary-action" type="button" onClick={()=>manageProduct(product,"edit")}>Edit</button><button className="secondary-action" type="button" onClick={()=>manageProduct(product,"delete")}>Delete</button>{selectedListId&&<button className="secondary-action" type="button" onClick={()=>addCatalogueProductToList(product)}>Add to list</button>}</div>
             </div>
             {expandedPriceProductId === product.id && <div className="product-price-management">
-              <div className="product-price-heading"><div><strong>Supermarket prices</strong><span>Latest recorded price at each supermarket</span></div><button className="secondary-action" type="button" onClick={() => { setPriceProductId(priceProductId === product.id ? null : product.id); setPriceValue(""); }}>＋ Record a price</button></div>
+              <div className="product-price-heading"><div><strong>Supermarket prices</strong><span>Latest recorded price at each supermarket</span></div><button className="secondary-action" type="button" onClick={() => { setEditingEntity(null); setPriceProductId(priceProductId === product.id ? null : product.id); setPriceValue(""); setPriceCurrency("COP"); }}>＋ Record a price</button></div>
               <div className="product-prices">{product.priceObservations.length ? [...product.priceObservations].sort((a, b) => a.currency === b.currency ? Number(a.price) - Number(b.price) : a.currency.localeCompare(b.currency)).map((observation) => <div className="price-entry" key={observation.id}>
-                {editingEntity?.type === "price" && editingEntity.id === observation.id ? <form className="inline-edit-form price-inline-edit" onSubmit={saveInlineEdit}>
-                  <input aria-label="Price amount" type="number" min="0" max="99999999.99" step="0.01" value={editValues.price ?? ""} onChange={(event) => updateEditField("price", event.target.value)} required />
-                  <input aria-label="Currency code" value={editValues.currency ?? "COP"} onChange={(event) => updateEditField("currency", event.target.value.toUpperCase())} placeholder="Currency" maxLength={3} required />
-                  <input aria-label="Observed date" type="datetime-local" value={editValues.observedAt ?? ""} onChange={(event) => updateEditField("observedAt", event.target.value)} required />
-                  <input aria-label="Price source" value={editValues.source ?? ""} onChange={(event) => updateEditField("source", event.target.value)} placeholder="Source / note (optional)" maxLength={100} />
-                  <button className="primary-action" type="submit" disabled={savingEdit}>{savingEdit ? "Saving…" : "Save"}</button><button className="secondary-action" type="button" onClick={cancelEdit}>Cancel</button>
-                </form> : <><span>{observation.supermarket.name}</span><strong>{Number(observation.price).toFixed(2)} {observation.currency}</strong><span className="price-management-actions"><button type="button" onClick={() => managePrice(observation, "edit")}>Edit</button><button type="button" onClick={() => managePrice(observation, "delete")}>Delete</button></span></>}
+<span>{observation.supermarket.name}</span><strong>{Number(observation.price).toFixed(2)} {observation.currency}</strong><span className="price-management-actions"><button type="button" onClick={()=>managePrice({...observation,productId:product.id},"edit")}>Edit</button><button type="button" onClick={()=>managePrice(observation,"delete")}>Delete</button></span>
               </div>) : <p>No prices recorded yet. Add the first supermarket price.</p>}</div>
-              {priceProductId === product.id && <form className="record-price-form" onSubmit={savePrice}><strong>Record price at {product.name}</strong><select value={priceSupermarketId} onChange={(event) => setPriceSupermarketId(event.target.value)} required><option value="">Choose supermarket</option>{supermarkets.map((supermarket) => <option key={supermarket.id} value={supermarket.id}>{supermarket.name}{supermarket.chain ? ` · ${supermarket.chain}` : ""}</option>)}</select><div><input type="number" min="0" max="99999999.99" step="0.01" value={priceValue} onChange={(event) => setPriceValue(event.target.value)} placeholder="Price amount" required /><select aria-label="Price currency" value={priceCurrency} onChange={(event) => setPriceCurrency(event.target.value)}><option value="COP">COP $</option><option value="EUR">EUR €</option><option value="USD">USD $</option><option value="GBP">GBP £</option><option value="CHF">CHF</option><option value="CAD">CAD $</option><option value="AUD">AUD $</option></select><button className="primary-action" type="submit" disabled={savingPrice || !priceSupermarketId || priceValue === ""}>{savingPrice ? "Saving…" : "Save price"}</button></div></form>}
+              {priceProductId === product.id && <form className="record-price-form" onSubmit={savePrice}><strong>{editingEntity?.type === "price" ? "Edit price" : "Record price at " + product.name}</strong><select value={priceSupermarketId} onChange={(event) => setPriceSupermarketId(event.target.value)} required><option value="">Choose supermarket</option>{supermarkets.map((supermarket) => <option key={supermarket.id} value={supermarket.id}>{supermarket.name}{supermarket.chain ? ` · ${supermarket.chain}` : ""}</option>)}</select><div><input type="number" min="0" max="99999999.99" step="0.01" value={priceValue} onChange={(event) => setPriceValue(event.target.value)} placeholder="Price amount" required /><select aria-label="Price currency" value={priceCurrency} onChange={(event) => setPriceCurrency(event.target.value)}><option value="COP">COP $</option><option value="EUR">EUR €</option><option value="USD">USD $</option><option value="GBP">GBP £</option><option value="CHF">CHF</option><option value="CAD">CAD $</option><option value="AUD">AUD $</option></select><button className="primary-action" type="submit" disabled={savingPrice || !priceSupermarketId || priceValue === ""}>{savingPrice ? "Saving…" : editingEntity?.type === "price" ? "Save changes" : "Save price"}</button>{editingEntity?.type === "price" && <button type="button" className="secondary-action" onClick={() => {setEditingEntity(null);setPriceProductId(null);setPriceValue("");setPriceCurrency("COP");}}>Cancel</button>}</div></form>}
             </div>}
           </article>)}</div> : <div className="empty-dashboard"><div className="empty-illustration">⌕</div><h2>{catalogProducts.length ? "No products in this category" : "No products found"}</h2><p>{catalogProducts.length ? "Choose another category or select All categories." : "Add your first product using the form above, or try another search."}</p></div>}
         </section>}
