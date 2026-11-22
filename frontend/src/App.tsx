@@ -145,6 +145,8 @@ function App() {
   const [selectedListId, setSelectedListId] = useState<string | null>(null);
   const [activeView, setActiveView] = useState<"lists" | "catalog">("lists");
   const [catalogQuery, setCatalogQuery] = useState("");
+  const [categoryFilter, setCategoryFilter] = useState("ALL");
+  const [expandedPriceProductId, setExpandedPriceProductId] = useState<string | null>(null);
   const [catalogProducts, setCatalogProducts] = useState<CatalogProduct[]>([]);
   const [catalogCategories, setCatalogCategories] = useState<CatalogCategory[]>([]);
   const [categoryName, setCategoryName] = useState("");
@@ -482,6 +484,7 @@ function App() {
 
   const visibleLists = lists.filter((list) => filter === "ALL" || list.status === filter);
   const selectedList = lists.find((list) => list.id === selectedListId) ?? null;
+  const visibleCatalogProducts = catalogProducts.filter((product) => categoryFilter === "ALL" || product.category?.id === categoryFilter);
 
   if (checkingSession) {
     return <main className="auth-page"><div className="loading-card">Loading your shopping space…</div></main>;
@@ -572,14 +575,27 @@ function App() {
               <p>{supermarkets.length} supermarket{supermarkets.length === 1 ? "" : "s"} in your directory</p><div className="directory-list">{supermarkets.map((market) => <div key={market.id}><span><strong>{market.name}</strong>{market.chain ? ` · ${market.chain}` : ""}</span><span><button type="button" onClick={() => manageSupermarket(market, "edit")}>Edit</button><button type="button" onClick={() => manageSupermarket(market, "delete")}>Delete</button></span></div>)}</div>
             </form>
           </div>
-          <div className="catalog-results-heading"><h3>Products</h3><span>Latest recorded prices appear under each product.</span></div>
-          {catalogLoading ? <div className="empty-dashboard">Loading catalogue…</div> : catalogProducts.length ? <div className="product-grid">{catalogProducts.map((product) => <article className="product-card" key={product.id}>
-            <div className="product-card-top"><span className="product-category">{product.category?.name ?? "Uncategorised"}</span><span className="product-unit">{product.unit ?? "Product"}</span></div>
-            <h3>{product.name}</h3><p className="product-brand">{product.brand ?? "No brand specified"}</p>
-            <div className="product-prices">{product.priceObservations.length ? [...product.priceObservations].sort((a, b) => a.currency === b.currency ? Number(a.price) - Number(b.price) : a.currency.localeCompare(b.currency)).map((observation) => <div key={observation.id}><span>{observation.supermarket.name}</span><strong>{Number(observation.price).toFixed(2)} {observation.currency}</strong><span className="price-management-actions"><button type="button" onClick={() => managePrice(product.id, observation, "edit")}>Edit</button><button type="button" onClick={() => managePrice(product.id, observation, "delete")}>Delete</button></span></div>) : <p>No prices recorded yet.</p>}</div>
-            <div className="product-card-actions">{selectedListId && <button className="primary-action" onClick={() => addCatalogueProductToList(product)}>Add to selected list</button>}<button className="secondary-action" onClick={() => manageProduct(product, "edit")}>Edit product</button><button className="secondary-action" onClick={() => manageProduct(product, "delete")}>Delete</button><button className="secondary-action" onClick={() => { setPriceProductId(priceProductId === product.id ? null : product.id); setPriceValue(""); }}>Record a price</button></div>
-            {priceProductId === product.id && <form className="record-price-form" onSubmit={savePrice}><strong>Record price at {product.name}</strong><select value={priceSupermarketId} onChange={(event) => setPriceSupermarketId(event.target.value)} required><option value="">Choose supermarket</option>{supermarkets.map((supermarket) => <option key={supermarket.id} value={supermarket.id}>{supermarket.name}{supermarket.chain ? ` · ${supermarket.chain}` : ""}</option>)}</select><div><input type="number" min="0" max="99999999.99" step="0.01" value={priceValue} onChange={(event) => setPriceValue(event.target.value)} placeholder="Price amount" required /><select aria-label="Price currency" value={priceCurrency} onChange={(event) => setPriceCurrency(event.target.value)}><option value="COP">COP $</option><option value="EUR">EUR €</option><option value="USD">USD $</option><option value="GBP">GBP £</option><option value="CHF">CHF</option><option value="CAD">CAD $</option><option value="AUD">AUD $</option></select><button className="primary-action" type="submit" disabled={savingPrice || !priceSupermarketId || priceValue === ""}>{savingPrice ? "Saving…" : "Save price"}</button></div></form>}
-          </article>)}</div> : <div className="empty-dashboard"><div className="empty-illustration">⌕</div><h2>No products found</h2><p>Add your first product using the form above, or try another search.</p></div>}
+          <div className="catalog-results-toolbar">
+            <div className="catalog-results-heading"><h3>Products</h3><span>{visibleCatalogProducts.length} shown · {catalogProducts.length} total</span></div>
+            <label className="category-filter"><span>Filter by category</span><select value={categoryFilter} onChange={(event) => { setCategoryFilter(event.target.value); setExpandedPriceProductId(null); }}><option value="ALL">All categories</option>{catalogCategories.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}</select></label>
+          </div>
+          {catalogLoading ? <div className="empty-dashboard">Loading catalogue…</div> : visibleCatalogProducts.length ? <div className="product-directory">{visibleCatalogProducts.map((product) => <article className={expandedPriceProductId === product.id ? "product-row expanded" : "product-row"} key={product.id}>
+            <div className="product-row-main">
+              <div className="product-row-identity"><span className="product-category">{product.category?.name ?? "Uncategorised"}</span><h3>{product.name}</h3><p>{product.brand ?? "No brand"}{product.unit ? ` · ${product.unit}` : ""}</p></div>
+              <div className="product-row-summary"><span>{product.priceObservations.length} {product.priceObservations.length === 1 ? "supermarket price" : "supermarket prices"}</span><strong>{product.priceObservations.length ? `${product.priceObservations.length} recorded` : "No prices yet"}</strong></div>
+              <div className="product-row-actions">
+                <button className="primary-action" type="button" onClick={() => setExpandedPriceProductId(expandedPriceProductId === product.id ? null : product.id)}>{expandedPriceProductId === product.id ? "Hide prices" : "Manage prices"}</button>
+                <button className="secondary-action" type="button" onClick={() => manageProduct(product, "edit")}>Edit</button>
+                <button className="secondary-action" type="button" onClick={() => manageProduct(product, "delete")}>Delete</button>
+                {selectedListId && <button className="secondary-action" type="button" onClick={() => addCatalogueProductToList(product)}>Add to list</button>}
+              </div>
+            </div>
+            {expandedPriceProductId === product.id && <div className="product-price-management">
+              <div className="product-price-heading"><div><strong>Supermarket prices</strong><span>Latest recorded price at each supermarket</span></div><button className="secondary-action" type="button" onClick={() => { setPriceProductId(priceProductId === product.id ? null : product.id); setPriceValue(""); }}>＋ Record a price</button></div>
+              <div className="product-prices">{product.priceObservations.length ? [...product.priceObservations].sort((a, b) => a.currency === b.currency ? Number(a.price) - Number(b.price) : a.currency.localeCompare(b.currency)).map((observation) => <div key={observation.id}><span>{observation.supermarket.name}</span><strong>{Number(observation.price).toFixed(2)} {observation.currency}</strong><span className="price-management-actions"><button type="button" onClick={() => managePrice(product.id, observation, "edit")}>Edit</button><button type="button" onClick={() => managePrice(product.id, observation, "delete")}>Delete</button></span></div>) : <p>No prices recorded yet. Add the first supermarket price.</p>}</div>
+              {priceProductId === product.id && <form className="record-price-form" onSubmit={savePrice}><strong>Record price at {product.name}</strong><select value={priceSupermarketId} onChange={(event) => setPriceSupermarketId(event.target.value)} required><option value="">Choose supermarket</option>{supermarkets.map((supermarket) => <option key={supermarket.id} value={supermarket.id}>{supermarket.name}{supermarket.chain ? ` · ${supermarket.chain}` : ""}</option>)}</select><div><input type="number" min="0" max="99999999.99" step="0.01" value={priceValue} onChange={(event) => setPriceValue(event.target.value)} placeholder="Price amount" required /><select aria-label="Price currency" value={priceCurrency} onChange={(event) => setPriceCurrency(event.target.value)}><option value="COP">COP $</option><option value="EUR">EUR €</option><option value="USD">USD $</option><option value="GBP">GBP £</option><option value="CHF">CHF</option><option value="CAD">CAD $</option><option value="AUD">AUD $</option></select><button className="primary-action" type="submit" disabled={savingPrice || !priceSupermarketId || priceValue === ""}>{savingPrice ? "Saving…" : "Save price"}</button></div></form>}
+            </div>}
+          </article>)}</div> : <div className="empty-dashboard"><div className="empty-illustration">⌕</div><h2>{catalogProducts.length ? "No products in this category" : "No products found"}</h2><p>{catalogProducts.length ? "Choose another category or select All categories." : "Add your first product using the form above, or try another search."}</p></div>}
         </section>}
         <footer className="app-footer"><span>ShoppingMarket</span><span>Shared lists for better everyday shopping.</span></footer>
       </main>
