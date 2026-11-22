@@ -335,7 +335,7 @@ router.delete("/prices/:priceId", async (request, response, next) => {
 router.post("/products/:productId/prices", async (request, response, next) => {
   try {
     const recordedBy = userId(response);
-    const { supermarketId, price, currency = "EUR", source } = request.body ?? {};
+    const { supermarketId, price, currency = "COP", source } = request.body ?? {};
     if (typeof supermarketId !== "string" || typeof price !== "number" ||
         !Number.isFinite(price) || price < 0 || price > 99999999.99 ||
         !/^[A-Za-z]{3}$/.test(currency) ||
