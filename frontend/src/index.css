@@ -47,3 +47,29 @@ h1{max-width:570px;margin:20px 0 18px;font-family:Manrope,sans-serif;font-size:c
 .price-management-actions{display:inline-flex;gap:5px;margin-left:auto}
 .price-management-actions button{padding:3px 7px;border:1px solid #e0e8dc;border-radius:6px;background:#fff;color:#58705a;font-size:9px;font-weight:600;cursor:pointer}
 .product-prices>div{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+
+
+/* Category-filtered compact product directory */
+.catalog-results-toolbar{display:flex;justify-content:space-between;align-items:end;gap:16px;margin:28px 1% 13px}
+.catalog-results-toolbar .catalog-results-heading{margin:0}
+.category-filter{display:grid;gap:5px;min-width:210px;color:#687663;font-size:10px;font-weight:600}
+.category-filter select{height:36px;padding:0 10px;border:1px solid #dfe6d9;border-radius:8px;background:#fff;color:#354232;font-size:11px}
+.product-directory{display:grid;gap:8px}
+.product-row{border:1px solid #e4e9df;border-radius:10px;background:#fff;overflow:hidden}
+.product-row-main{display:flex;align-items:center;gap:18px;padding:12px 15px}
+.product-row-identity{flex:1;min-width:180px}
+.product-row-identity .product-category{display:block;margin-bottom:3px}
+.product-row-identity h3{margin:0;color:#354232;font:700 13px Manrope,sans-serif}
+.product-row-identity p{margin:3px 0 0;color:#929b8c;font-size:10px}
+.product-row-summary{display:grid;gap:3px;min-width:125px;color:#929b8c;font-size:9px}
+.product-row-summary strong{color:#527756;font-size:10px}
+.product-row-actions{display:flex;align-items:center;gap:5px;flex-wrap:wrap}
+.product-row-actions button{height:31px;padding:0 9px;font-size:9px}
+.product-price-management{padding:13px 15px 15px;border-top:1px solid #edf0e9;background:#fafbf8}
+.product-price-heading{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:10px}
+.product-price-heading>div{display:grid;gap:3px}
+.product-price-heading strong{color:#354232;font-size:11px}
+.product-price-heading span{color:#929b8c;font-size:9px}
+.product-price-heading button{height:32px;padding:0 10px;font-size:9px}
+.product-price-management .product-prices{padding:8px 0;border-top:0;border-bottom:0}
+@media(max-width:760px){.product-row-main{align-items:flex-start;flex-wrap:wrap;gap:10px}.product-row-identity{flex-basis:calc(100% - 140px)}.product-row-summary{min-width:120px}.product-row-actions{width:100%}.product-row-actions button{flex:1}.catalog-results-toolbar{align-items:stretch;flex-direction:column}.category-filter{min-width:0}.product-price-heading{align-items:flex-start}}
