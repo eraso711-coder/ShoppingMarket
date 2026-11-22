@@ -437,10 +437,17 @@ function App() {
     }
   }
 
+  function clearCatalogueFormValues() {
+    setCategoryName("");
+    setProductName(""); setProductBrand(""); setProductBarcode(""); setProductDescription(""); setProductCategoryId(""); setProductUnit(""); setProductQuantity("");
+    setSupermarketName(""); setSupermarketChain(""); setSupermarketWebsite("");
+    setPriceProductId(null); setPriceValue(""); setPriceCurrency("COP");
+  }
+
   async function manageCategory(category: CatalogCategory, action: "edit" | "delete") {
     if (!token) return;
     if (action === "edit") {
-      setEditingEntity({type:"category",id:category.id});setCategoryName(category.name);setCatalogError("");
+      clearCatalogueFormValues();setEditingEntity({type:"category",id:category.id});setCategoryName(category.name);setCatalogError("");
       return;
     }
     if (!window.confirm(`Delete category "${category.name}"?`)) return;
@@ -457,7 +464,7 @@ function App() {
   async function manageSupermarket(supermarket: Supermarket, action: "edit" | "delete") {
     if (!token) return;
     if (action === "edit") {
-      setEditingEntity({type:"supermarket",id:supermarket.id});setSupermarketName(supermarket.name);setSupermarketChain(supermarket.chain??"");setSupermarketWebsite(supermarket.website??"");setCatalogError("");
+      clearCatalogueFormValues();setEditingEntity({type:"supermarket",id:supermarket.id});setSupermarketName(supermarket.name);setSupermarketChain(supermarket.chain??"");setSupermarketWebsite(supermarket.website??"");setCatalogError("");
       return;
     }
     if (!window.confirm(`Delete supermarket "${supermarket.name}"? This is only possible when it has no offers or price history.`)) return;
@@ -474,7 +481,7 @@ function App() {
   async function manageProduct(product: CatalogProduct, action: "edit" | "delete") {
     if (!token) return;
     if (action === "edit") {
-      setEditingEntity({type:"product",id:product.id});setProductName(product.name);setProductBrand(product.brand??"");setProductBarcode(product.barcode??"");setProductDescription(product.description??"");setProductCategoryId(product.categoryId??product.category?.id??"");setProductUnit(product.unit??"");setProductQuantity(product.quantity??"");setCatalogError("");
+      clearCatalogueFormValues();setEditingEntity({type:"product",id:product.id});setProductName(product.name);setProductBrand(product.brand??"");setProductBarcode(product.barcode??"");setProductDescription(product.description??"");setProductCategoryId(product.categoryId??product.category?.id??"");setProductUnit(product.unit??"");setProductQuantity(product.quantity??"");setCatalogError("");
       return;
     }
     if (!window.confirm(`Delete product "${product.name}"? Products used in lists or price history cannot be deleted.`)) return;
@@ -490,7 +497,7 @@ function App() {
   async function managePrice(observation: CatalogProduct["priceObservations"][number], action: "edit" | "delete") {
     if (!token) return;
     if (action === "edit") {
-      setEditingEntity({type:"price",id:observation.id});setPriceProductId(observation.productId);setPriceValue(observation.price);setPriceCurrency(observation.currency);setPriceSupermarketId(observation.supermarket.id);setCatalogError("");
+      clearCatalogueFormValues();setEditingEntity({type:"price",id:observation.id});setPriceProductId(observation.productId);setPriceValue(observation.price);setPriceCurrency(observation.currency);setPriceSupermarketId(observation.supermarket.id);setCatalogError("");
       return;
     }
     if (!window.confirm(`Delete the ${observation.price} ${observation.currency} price at ${observation.supermarket.name}?`)) return;
