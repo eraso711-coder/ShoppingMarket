@@ -673,11 +673,13 @@ function App() {
               <div className="catalog-form-row"><input value={productUnit} onChange={(event) => setProductUnit(event.target.value)} placeholder="Unit (e.g. bottle, pack)" maxLength={30} /><input type="number" min="0.001" max="9999999.999" step="0.001" value={productQuantity} onChange={(event) => setProductQuantity(event.target.value)} placeholder="Pack quantity" /><button className="primary-action" type="submit" disabled={creatingProduct || !productName.trim() || !productCategoryId}>{creatingProduct ? "Saving…" : "Add product"}</button></div>
               {catalogCategories.length === 0 && <p className="catalog-form-hint">Create your first category above before adding products.</p>}
             </form>
-            <form className="catalog-create-form supermarket-form" onSubmit={createSupermarket}>
+            <section className="catalog-create-form supermarket-form">
               <div className="catalog-form-title"><span className="preview-kicker">PRICE SOURCES</span><strong>Supermarkets</strong></div>
+              <form className="supermarket-create-fields" onSubmit={createSupermarket}>
               <div className="catalog-form-row"><input value={supermarketName} onChange={(event) => setSupermarketName(event.target.value)} placeholder="Supermarket name" maxLength={100} required /><input value={supermarketChain} onChange={(event) => setSupermarketChain(event.target.value)} placeholder="Chain (optional)" maxLength={100} /></div>
               <input type="url" value={supermarketWebsite} onChange={(event) => setSupermarketWebsite(event.target.value)} placeholder="Website URL (optional, https://…)" maxLength={300} />
               <button className="secondary-action" type="submit" disabled={creatingSupermarket || !supermarketName.trim()}>{creatingSupermarket ? "Saving…" : "Add supermarket"}</button>
+              </form>
               <p>{supermarkets.length} supermarket{supermarkets.length === 1 ? "" : "s"} in your directory</p><div className="directory-list">{supermarkets.map((market) => <div className="directory-entry" key={market.id}>
                 {editingEntity?.type === "supermarket" && editingEntity.id === market.id ? <form className="inline-edit-form supermarket-inline-edit" onSubmit={saveInlineEdit}>
                   <input aria-label="Supermarket name" value={editValues.name ?? ""} onChange={(event) => updateEditField("name", event.target.value)} placeholder="Supermarket name" maxLength={100} required />
@@ -686,7 +688,7 @@ function App() {
                   <button className="primary-action" type="submit" disabled={savingEdit}>{savingEdit ? "Saving…" : "Save"}</button><button className="secondary-action" type="button" onClick={cancelEdit}>Cancel</button>
                 </form> : <><span><strong>{market.name}</strong>{market.chain ? ` · ${market.chain}` : ""}{market.website ? <a href={market.website} target="_blank" rel="noreferrer"> · Website</a> : ""}</span><span><button type="button" onClick={() => manageSupermarket(market, "edit")}>Edit</button><button type="button" onClick={() => manageSupermarket(market, "delete")}>Delete</button></span></>}
               </div>)}</div>
-            </form>
+            </section>
           </div>
           <div className="catalog-results-toolbar">
             <div className="catalog-results-heading"><h3>Products</h3><span>{visibleCatalogProducts.length} shown · {catalogProducts.length} total</span></div>
