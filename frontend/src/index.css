@@ -77,3 +77,39 @@ h1{max-width:570px;margin:20px 0 18px;font-family:Manrope,sans-serif;font-size:c
 
 .list-management-actions{display:flex;align-items:center;justify-content:flex-end;flex-wrap:wrap;gap:8px}
 @media(max-width:760px){.list-management-actions{justify-content:flex-start;width:100%}.detail-heading{align-items:flex-start;flex-direction:column}}
+
+
+/* Inline editing shared by catalogue records and shopping lists */
+.inline-edit-form{display:grid;gap:9px;width:100%;min-width:0;padding:12px;border:1px solid #dce7d8;border-radius:9px;background:#f8faf6}
+.inline-edit-form input,.inline-edit-form select,.inline-edit-form textarea{width:100%;min-width:0;min-height:36px;padding:8px 10px;border:1px solid #dfe6da;border-radius:7px;background:#fff;color:#354232;font:inherit;font-size:11px;outline:none}
+.inline-edit-form textarea{resize:vertical}
+.inline-edit-form input:focus,.inline-edit-form select:focus,.inline-edit-form textarea:focus{border-color:#719775;box-shadow:0 0 0 3px #7197751c}
+.inline-edit-actions{display:flex;flex-wrap:wrap;gap:7px}
+.inline-edit-actions button,.inline-edit-form>button{min-height:34px}
+.category-edit-card{display:flex;align-items:center;gap:6px;max-width:100%;padding:5px;border:1px solid #e0e8dc;border-radius:10px;background:#fff}
+.category-inline-edit{grid-template-columns:minmax(120px,1fr) minmax(130px,1fr) auto auto;align-items:center;padding:7px;border:0;background:transparent}
+.category-inline-edit input,.category-inline-edit select{height:32px;min-height:32px}
+.category-inline-edit button{height:32px;padding:0 10px;font-size:10px}
+.supermarket-inline-edit{grid-template-columns:repeat(3,minmax(0,1fr)) auto auto;align-items:center;padding:10px}
+.supermarket-inline-edit button{min-height:34px}
+.directory-entry{display:flex;align-items:center;justify-content:space-between;gap:9px;flex-wrap:wrap}
+.directory-entry>span{min-width:0}
+.product-inline-edit{flex:1}
+.inline-edit-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.inline-edit-grid textarea{grid-column:1/-1}
+.price-entry{width:100%;align-items:center}
+.price-inline-edit{grid-template-columns:minmax(90px,.7fr) minmax(75px,.5fr) minmax(180px,1fr) minmax(130px,1fr) auto auto;align-items:center;padding:9px}
+.price-inline-edit button{min-height:34px}
+.list-inline-edit{flex:1;max-width:620px;grid-template-columns:1fr 1fr;align-items:end}
+.list-inline-edit label{display:grid;gap:5px;color:#687663;font-size:10px;font-weight:600}
+.list-inline-edit .inline-edit-actions{grid-column:1/-1}
+@media(max-width:760px){
+ .category-edit-card{width:100%;flex-wrap:wrap}
+ .category-inline-edit,.supermarket-inline-edit,.price-inline-edit{grid-template-columns:1fr}
+ .category-inline-edit button,.supermarket-inline-edit button,.price-inline-edit button{width:100%}
+ .inline-edit-grid{grid-template-columns:1fr}
+ .inline-edit-grid textarea{grid-column:auto}
+ .list-inline-edit{grid-template-columns:1fr}
+ .list-inline-edit .inline-edit-actions{grid-column:auto}
+ .product-inline-edit{flex-basis:100%}
+}
