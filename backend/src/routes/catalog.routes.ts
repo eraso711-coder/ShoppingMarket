@@ -138,9 +138,9 @@ router.patch("/supermarkets/:supermarketId", async (request, response, next) => 
 });
 router.delete("/supermarkets/:supermarketId", async (request, response, next) => {
   try {
-    const supermarket = await prisma.supermarket.findUnique({ where: { id: request.params.supermarketId }, include: { _count: { select: { offers: true, prices: true } } } });
+    const supermarket = await prisma.supermarket.findUnique({ where: { id: request.params.supermarketId }, include: { _count: { select: { prices: true } } } });
     if (!supermarket) { response.status(404).json({ error: "Supermarket not found." }); return; }
-    if (supermarket._count.offers || supermarket._count.prices) { response.status(409).json({ error: "This supermarket has offers or price history. Remove those records before deleting it." }); return; }
+    if (supermarket._count.prices) { response.status(409).json({ error: "This supermarket has price history and cannot be deleted without losing historical records." }); return; }
     await prisma.supermarket.delete({ where: { id: supermarket.id } });
     response.status(204).end();
   } catch (error) { next(error); }
@@ -266,9 +266,9 @@ router.patch("/products/:productId", async (request, response, next) => {
 });
 router.delete("/products/:productId", async (request, response, next) => {
   try {
-    const product = await prisma.product.findUnique({ where: { id: request.params.productId }, include: { _count: { select: { priceObservations: true, listItems: true, supermarketOffers: true } } } });
+    const product = await prisma.product.findUnique({ where: { id: request.params.productId }, include: { _count: { select: { priceObservations: true, listItems: true } } } });
     if (!product) { response.status(404).json({ error: "Product not found." }); return; }
-    if (product._count.priceObservations || product._count.listItems || product._count.supermarketOffers) { response.status(409).json({ error: "This product is referenced by shopping lists, supermarket offers or price history. Remove those records before deleting it." }); return; }
+    if (product._count.priceObservations || product._count.listItems) { response.status(409).json({ error: "This product is referenced by shopping lists or price history. Remove those records before deleting it." }); return; }
     await prisma.product.delete({ where: { id: product.id } });
     response.status(204).end();
   } catch (error) { next(error); }
