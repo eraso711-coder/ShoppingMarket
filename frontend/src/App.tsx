@@ -64,6 +64,7 @@ function ShoppingItemRow({
   const [name, setName] = useState(item.customName ?? item.product?.name ?? "");
   const [quantity, setQuantity] = useState(String(item.quantity));
   const [notes, setNotes] = useState(item.notes ?? "");
+  const [status, setStatus] = useState<Item["status"]>(item.status);
   const [saving, setSaving] = useState(false);
   const [removing, setRemoving] = useState(false);
   const [dirty, setDirty] = useState(false);
@@ -77,7 +78,7 @@ function ShoppingItemRow({
     try {
       await apiRequest(`/shopping-lists/${listId}/items/${item.id}`, token, {
         method: "PATCH",
-        body: JSON.stringify({ name, quantity: Number(quantity), notes })
+        body: JSON.stringify({ name, quantity: Number(quantity), notes, status })
       });
       setDirty(false);
       onChanged();
@@ -125,6 +126,7 @@ function ShoppingItemRow({
         </div>
         <div className="item-secondary-fields">
           <input value={notes} onChange={(event) => { setNotes(event.target.value); setDirty(true); }} placeholder="Add a note (optional)" aria-label={`Notes for ${displayName}`} />
+          <select aria-label={`Status of ${displayName}`} value={status} onChange={(event) => { setStatus(event.target.value as Item["status"]); setDirty(true); }}><option value="TO_BUY">To buy</option><option value="IN_CART">In cart</option><option value="PURCHASED">Purchased</option><option value="UNAVAILABLE">Unavailable</option></select>
           {dirty && <button className="save-item-button" type="submit" disabled={saving}>{saving ? "Saving…" : "Save"}</button>}
           <button className="remove-item-button" type="button" onClick={remove} disabled={removing}>{removing ? "…" : "Remove"}</button>
         </div>
@@ -273,7 +275,7 @@ function App() {
 
   function editSelectedList() {
     if (!selectedList) return;
-    beginEdit("list", selectedList.id, { name: selectedList.name, dueAt: selectedList.dueAt ? new Date(selectedList.dueAt).toISOString().slice(0, 16) : "" });
+    beginEdit("list", selectedList.id, { name: selectedList.name, status: selectedList.status, dueAt: selectedList.dueAt ? new Date(selectedList.dueAt).toISOString().slice(0, 16) : "" });
   }
 
   async function deleteSelectedList() {
@@ -450,7 +452,7 @@ function App() {
         setCatalogProducts(data.products);
       } else if (type === "list") {
         await apiRequest(`/shopping-lists/${id}`, token, { method: "PATCH", body: JSON.stringify({
-          name: editValues.name, dueAt: editValues.dueAt ? new Date(editValues.dueAt).toISOString() : null
+          name: editValues.name, status: editValues.status, dueAt: editValues.dueAt ? new Date(editValues.dueAt).toISOString() : null
         }) });
         await refreshLists(token);
       }
@@ -617,6 +619,7 @@ function App() {
               <div className="detail-heading">
                 {editingEntity?.type === "list" && editingEntity.id === selectedList.id ? <form className="inline-edit-form list-inline-edit" onSubmit={saveInlineEdit}>
                   <label>List name<input value={editValues.name ?? ""} onChange={(event) => updateEditField("name", event.target.value)} maxLength={100} required /></label>
+                  <label>Status<select value={editValues.status ?? "ACTIVE"} onChange={(event) => updateEditField("status", event.target.value)}><option value="ACTIVE">Active</option><option value="COMPLETED">Completed</option><option value="ARCHIVED">Archived</option></select></label>
                   <label>Due date<input type="datetime-local" value={editValues.dueAt ?? ""} onChange={(event) => updateEditField("dueAt", event.target.value)} /></label>
                   <div className="inline-edit-actions"><button className="primary-action" type="submit" disabled={savingEdit}>{savingEdit ? "Saving…" : "Save changes"}</button><button className="secondary-action" type="button" onClick={cancelEdit}>Cancel</button></div>
                 </form> : <div><span className="preview-kicker">{selectedList.family.name.toUpperCase()}</span><h2>{selectedList.name}</h2><p>{selectedList.items.length} {selectedList.items.length === 1 ? "item" : "items"} · {selectedList.items.filter((item) => item.status === "PURCHASED").length} purchased</p></div>}
@@ -723,7 +726,7 @@ function App() {
               <div className="product-prices">{product.priceObservations.length ? [...product.priceObservations].sort((a, b) => a.currency === b.currency ? Number(a.price) - Number(b.price) : a.currency.localeCompare(b.currency)).map((observation) => <div className="price-entry" key={observation.id}>
                 {editingEntity?.type === "price" && editingEntity.id === observation.id ? <form className="inline-edit-form price-inline-edit" onSubmit={saveInlineEdit}>
                   <input aria-label="Price amount" type="number" min="0" max="99999999.99" step="0.01" value={editValues.price ?? ""} onChange={(event) => updateEditField("price", event.target.value)} required />
-                  <select aria-label="Currency" value={editValues.currency ?? "COP"} onChange={(event) => updateEditField("currency", event.target.value)}>{["COP","EUR","USD","GBP","CHF","CAD","AUD"].map((currency) => <option key={currency} value={currency}>{currency}</option>)}</select>
+                  <input aria-label="Currency code" value={editValues.currency ?? "COP"} onChange={(event) => updateEditField("currency", event.target.value.toUpperCase())} placeholder="Currency" maxLength={3} required />
                   <input aria-label="Observed date" type="datetime-local" value={editValues.observedAt ?? ""} onChange={(event) => updateEditField("observedAt", event.target.value)} required />
                   <input aria-label="Price source" value={editValues.source ?? ""} onChange={(event) => updateEditField("source", event.target.value)} placeholder="Source / note (optional)" maxLength={100} />
                   <button className="primary-action" type="submit" disabled={savingEdit}>{savingEdit ? "Saving…" : "Save"}</button><button className="secondary-action" type="button" onClick={cancelEdit}>Cancel</button>
