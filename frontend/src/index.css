@@ -35,3 +35,11 @@ h1{max-width:570px;margin:20px 0 18px;font-family:Manrope,sans-serif;font-size:c
 .category-empty,.catalog-form-hint{margin:0;color:#929b8c;font-size:10px}
 .catalog-create-form select:disabled{background:#f2f3f0;color:#9aa294;cursor:not-allowed}
 @media(max-width:680px){.category-manager{padding:16px}.category-manager-heading{align-items:start}.category-create-form{flex-direction:column}.category-create-form .primary-action{width:100%}}
+
+.directory-list{display:grid;gap:7px;margin-top:10px;padding-top:10px;border-top:1px solid #edf0e9}
+.directory-list>div{display:flex;justify-content:space-between;align-items:center;gap:8px;color:#667260;font-size:10px}
+.directory-list>div>span:last-child{display:flex;gap:5px;flex-shrink:0}
+.directory-list button,.category-chip button{padding:4px 7px;border:1px solid #e0e8dc;border-radius:6px;background:#fff;color:#58705a;font-size:9px;font-weight:600}
+.category-chip{display:inline-flex;align-items:center;gap:5px}
+.record-price-form>div select{width:105px;flex-shrink:0}
+@media(max-width:680px){.directory-list>div{align-items:flex-start}.record-price-form>div{flex-wrap:wrap}.record-price-form>div input{min-width:100%}.record-price-form>div select{flex:1}}
