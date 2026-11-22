@@ -412,8 +412,10 @@ function App() {
       if (!name?.trim()) return;
       const brand = window.prompt("Brand (optional)", product.brand ?? "");
       const unit = window.prompt("Unit (optional)", product.unit ?? "");
-      const categoryId = window.prompt("Category ID (choose from the category selector below):", product.category?.id ?? "");
-      if (!categoryId) return;
+      const categoryName = window.prompt(`Category name (available: ${catalogCategories.map((category) => category.name).join(", ")})`, product.category?.name ?? "");
+      if (!categoryName?.trim()) return;
+      const categoryId = catalogCategories.find((category) => category.name.toLowerCase() === categoryName.trim().toLowerCase())?.id;
+      if (!categoryId) { setCatalogError("That category was not found. Please enter one of the listed category names."); return; }
       await apiRequest(`/catalog/products/${product.id}`, token, { method: "PATCH", body: JSON.stringify({ name, brand, unit, categoryId }) });
     } else {
       if (!window.confirm(`Delete product "${product.name}"? Products used in lists or price history cannot be deleted.`)) return;
