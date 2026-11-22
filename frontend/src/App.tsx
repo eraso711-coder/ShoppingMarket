@@ -615,9 +615,13 @@ function App() {
           <section className="list-detail-panel">
             {selectedList ? <>
               <div className="detail-heading">
-                <div><span className="preview-kicker">{selectedList.family.name.toUpperCase()}</span><h2>{selectedList.name}</h2><p>{selectedList.items.length} {selectedList.items.length === 1 ? "item" : "items"} · {selectedList.items.filter((item) => item.status === "PURCHASED").length} purchased</p></div>
+                {editingEntity?.type === "list" && editingEntity.id === selectedList.id ? <form className="inline-edit-form list-inline-edit" onSubmit={saveInlineEdit}>
+                  <label>List name<input value={editValues.name ?? ""} onChange={(event) => updateEditField("name", event.target.value)} maxLength={100} required /></label>
+                  <label>Due date<input type="datetime-local" value={editValues.dueAt ?? ""} onChange={(event) => updateEditField("dueAt", event.target.value)} /></label>
+                  <div className="inline-edit-actions"><button className="primary-action" type="submit" disabled={savingEdit}>{savingEdit ? "Saving…" : "Save changes"}</button><button className="secondary-action" type="button" onClick={cancelEdit}>Cancel</button></div>
+                </form> : <div><span className="preview-kicker">{selectedList.family.name.toUpperCase()}</span><h2>{selectedList.name}</h2><p>{selectedList.items.length} {selectedList.items.length === 1 ? "item" : "items"} · {selectedList.items.filter((item) => item.status === "PURCHASED").length} purchased</p></div>}
                 <div className="list-management-actions">
-                  <button className="secondary-action" type="button" onClick={editSelectedList}>Edit list</button>
+                  {!(editingEntity?.type === "list" && editingEntity.id === selectedList.id) && <button className="secondary-action" type="button" onClick={editSelectedList}>Edit list</button>}
                   <button className="secondary-action" type="button" onClick={deleteSelectedList}>Delete list</button>
                   {selectedList.status !== "ARCHIVED" && <button className={selectedList.status === "COMPLETED" ? "secondary-action" : "primary-action"} onClick={() => updateListStatus(selectedList.status === "COMPLETED" ? "ACTIVE" : "COMPLETED")}>{selectedList.status === "COMPLETED" ? "Reopen list" : "Complete list"}</button>}
                 </div>
@@ -648,7 +652,13 @@ function App() {
               <button className="primary-action" type="submit" disabled={creatingCategory || !categoryName.trim()}>{creatingCategory ? "Creating…" : "＋ Add category"}</button>
             </form>
             <div className="category-list" aria-live="polite">
-              {catalogCategories.length ? catalogCategories.map((category) => <span className={productCategoryId === category.id ? "category-chip selected" : "category-chip"} key={category.id}>{category.name}{category.parentId ? ` · ${catalogCategories.find((entry) => entry.id === category.parentId)?.name ?? "Subcategory"}` : ""}{productCategoryId === category.id ? " ✓" : ""} <button type="button" onClick={() => manageCategory(category, "edit")}>Edit</button> <button type="button" onClick={() => manageCategory(category, "delete")}>Delete</button></span>) : <p className="category-empty">No categories yet. Add your first category above to get started.</p>}
+              {catalogCategories.length ? catalogCategories.map((category) => <div className="category-edit-card" key={category.id}>
+                {editingEntity?.type === "category" && editingEntity.id === category.id ? <form className="inline-edit-form category-inline-edit" onSubmit={saveInlineEdit}>
+                  <input aria-label="Category name" value={editValues.name ?? ""} onChange={(event) => updateEditField("name", event.target.value)} placeholder="Category name" maxLength={80} required />
+                  <select aria-label="Parent category" value={editValues.parentId ?? ""} onChange={(event) => updateEditField("parentId", event.target.value)}><option value="">No parent category</option>{catalogCategories.filter((entry) => entry.id !== category.id).map((entry) => <option key={entry.id} value={entry.id}>{entry.name}</option>)}</select>
+                  <button className="primary-action" type="submit" disabled={savingEdit}>{savingEdit ? "Saving…" : "Save"}</button><button className="secondary-action" type="button" onClick={cancelEdit}>Cancel</button>
+                </form> : <><span className={productCategoryId === category.id ? "category-chip selected" : "category-chip"}>{category.name}{category.parentId ? ` · ${catalogCategories.find((entry) => entry.id === category.parentId)?.name ?? "Subcategory"}` : ""}{productCategoryId === category.id ? " ✓" : ""}</span><button type="button" onClick={() => manageCategory(category, "edit")}>Edit</button><button type="button" onClick={() => manageCategory(category, "delete")}>Delete</button></>}
+              </div>) : <p className="category-empty">No categories yet. Add your first category above to get started.</p>}
             </div>
           </section>
           <div className="catalog-tools">
@@ -668,7 +678,14 @@ function App() {
               <div className="catalog-form-row"><input value={supermarketName} onChange={(event) => setSupermarketName(event.target.value)} placeholder="Supermarket name" maxLength={100} required /><input value={supermarketChain} onChange={(event) => setSupermarketChain(event.target.value)} placeholder="Chain (optional)" maxLength={100} /></div>
               <input type="url" value={supermarketWebsite} onChange={(event) => setSupermarketWebsite(event.target.value)} placeholder="Website URL (optional, https://…)" maxLength={300} />
               <button className="secondary-action" type="submit" disabled={creatingSupermarket || !supermarketName.trim()}>{creatingSupermarket ? "Saving…" : "Add supermarket"}</button>
-              <p>{supermarkets.length} supermarket{supermarkets.length === 1 ? "" : "s"} in your directory</p><div className="directory-list">{supermarkets.map((market) => <div key={market.id}><span><strong>{market.name}</strong>{market.chain ? ` · ${market.chain}` : ""}{market.website ? <a href={market.website} target="_blank" rel="noreferrer"> · Website</a> : ""}</span><span><button type="button" onClick={() => manageSupermarket(market, "edit")}>Edit</button><button type="button" onClick={() => manageSupermarket(market, "delete")}>Delete</button></span></div>)}</div>
+              <p>{supermarkets.length} supermarket{supermarkets.length === 1 ? "" : "s"} in your directory</p><div className="directory-list">{supermarkets.map((market) => <div className="directory-entry" key={market.id}>
+                {editingEntity?.type === "supermarket" && editingEntity.id === market.id ? <form className="inline-edit-form supermarket-inline-edit" onSubmit={saveInlineEdit}>
+                  <input aria-label="Supermarket name" value={editValues.name ?? ""} onChange={(event) => updateEditField("name", event.target.value)} placeholder="Supermarket name" maxLength={100} required />
+                  <input aria-label="Chain" value={editValues.chain ?? ""} onChange={(event) => updateEditField("chain", event.target.value)} placeholder="Chain (optional)" maxLength={100} />
+                  <input aria-label="Website" type="url" value={editValues.website ?? ""} onChange={(event) => updateEditField("website", event.target.value)} placeholder="Website URL (optional)" maxLength={300} />
+                  <button className="primary-action" type="submit" disabled={savingEdit}>{savingEdit ? "Saving…" : "Save"}</button><button className="secondary-action" type="button" onClick={cancelEdit}>Cancel</button>
+                </form> : <><span><strong>{market.name}</strong>{market.chain ? ` · ${market.chain}` : ""}{market.website ? <a href={market.website} target="_blank" rel="noreferrer"> · Website</a> : ""}</span><span><button type="button" onClick={() => manageSupermarket(market, "edit")}>Edit</button><button type="button" onClick={() => manageSupermarket(market, "delete")}>Delete</button></span></>}
+              </div>)}</div>
             </form>
           </div>
           <div className="catalog-results-toolbar">
@@ -677,18 +694,39 @@ function App() {
           </div>
           {catalogLoading ? <div className="empty-dashboard">Loading catalogue…</div> : visibleCatalogProducts.length ? <div className="product-directory">{visibleCatalogProducts.map((product) => <article className={expandedPriceProductId === product.id ? "product-row expanded" : "product-row"} key={product.id}>
             <div className="product-row-main">
-              <div className="product-row-identity"><span className="product-category">{product.category?.name ?? "Uncategorised"}</span><h3>{product.name}</h3><p>{product.brand ?? "No brand"}{product.unit ? ` · ${product.unit}` : ""}{product.quantity ? ` · ${product.quantity} ${product.unit ?? "units"}` : ""}</p></div>
-              <div className="product-row-summary"><span>{product.priceObservations.length} {product.priceObservations.length === 1 ? "supermarket price" : "supermarket prices"}</span><strong>{product.priceObservations.length ? `${product.priceObservations.length} recorded` : "No prices yet"}</strong></div>
-              <div className="product-row-actions">
-                <button className="primary-action" type="button" onClick={() => setExpandedPriceProductId(expandedPriceProductId === product.id ? null : product.id)}>{expandedPriceProductId === product.id ? "Hide prices" : "Manage prices"}</button>
-                <button className="secondary-action" type="button" onClick={() => manageProduct(product, "edit")}>Edit</button>
-                <button className="secondary-action" type="button" onClick={() => manageProduct(product, "delete")}>Delete</button>
-                {selectedListId && <button className="secondary-action" type="button" onClick={() => addCatalogueProductToList(product)}>Add to list</button>}
-              </div>
+              {editingEntity?.type === "product" && editingEntity.id === product.id ? <form className="inline-edit-form product-inline-edit" onSubmit={saveInlineEdit}>
+                <div className="inline-edit-grid">
+                  <input aria-label="Product name" value={editValues.name ?? ""} onChange={(event) => updateEditField("name", event.target.value)} placeholder="Product name" maxLength={150} required />
+                  <input aria-label="Brand" value={editValues.brand ?? ""} onChange={(event) => updateEditField("brand", event.target.value)} placeholder="Brand (optional)" maxLength={100} />
+                  <input aria-label="Barcode" value={editValues.barcode ?? ""} onChange={(event) => updateEditField("barcode", event.target.value)} placeholder="Barcode (optional)" maxLength={64} />
+                  <select aria-label="Category" value={editValues.categoryId ?? ""} onChange={(event) => updateEditField("categoryId", event.target.value)} required><option value="">Choose category</option>{catalogCategories.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}</select>
+                  <input aria-label="Unit" value={editValues.unit ?? ""} onChange={(event) => updateEditField("unit", event.target.value)} placeholder="Unit (e.g. bottle, pack)" maxLength={30} />
+                  <input aria-label="Pack quantity" type="number" min="0.001" max="9999999.999" step="0.001" value={editValues.quantity ?? ""} onChange={(event) => updateEditField("quantity", event.target.value)} placeholder="Pack quantity" />
+                  <textarea aria-label="Description" value={editValues.description ?? ""} onChange={(event) => updateEditField("description", event.target.value)} placeholder="Description (optional)" maxLength={1000} rows={2} />
+                </div>
+                <div className="inline-edit-actions"><button className="primary-action" type="submit" disabled={savingEdit || !editValues.name?.trim() || !editValues.categoryId}>{savingEdit ? "Saving…" : "Save changes"}</button><button className="secondary-action" type="button" onClick={cancelEdit}>Cancel</button></div>
+              </form> : <>
+                <div className="product-row-identity"><span className="product-category">{product.category?.name ?? "Uncategorised"}</span><h3>{product.name}</h3><p>{product.brand ?? "No brand"}{product.unit ? ` · ${product.unit}` : ""}{product.quantity ? ` · ${product.quantity} ${product.unit ?? "units"}` : ""}</p></div>
+                <div className="product-row-summary"><span>{product.priceObservations.length} {product.priceObservations.length === 1 ? "supermarket price" : "supermarket prices"}</span><strong>{product.priceObservations.length ? `${product.priceObservations.length} recorded` : "No prices yet"}</strong></div>
+                <div className="product-row-actions">
+                  <button className="primary-action" type="button" onClick={() => setExpandedPriceProductId(expandedPriceProductId === product.id ? null : product.id)}>{expandedPriceProductId === product.id ? "Hide prices" : "Manage prices"}</button>
+                  <button className="secondary-action" type="button" onClick={() => manageProduct(product, "edit")}>Edit</button>
+                  <button className="secondary-action" type="button" onClick={() => manageProduct(product, "delete")}>Delete</button>
+                  {selectedListId && <button className="secondary-action" type="button" onClick={() => addCatalogueProductToList(product)}>Add to list</button>}
+                </div>
+              </>}
             </div>
             {expandedPriceProductId === product.id && <div className="product-price-management">
               <div className="product-price-heading"><div><strong>Supermarket prices</strong><span>Latest recorded price at each supermarket</span></div><button className="secondary-action" type="button" onClick={() => { setPriceProductId(priceProductId === product.id ? null : product.id); setPriceValue(""); }}>＋ Record a price</button></div>
-              <div className="product-prices">{product.priceObservations.length ? [...product.priceObservations].sort((a, b) => a.currency === b.currency ? Number(a.price) - Number(b.price) : a.currency.localeCompare(b.currency)).map((observation) => <div key={observation.id}><span>{observation.supermarket.name}</span><strong>{Number(observation.price).toFixed(2)} {observation.currency}</strong><span className="price-management-actions"><button type="button" onClick={() => managePrice(observation, "edit")}>Edit</button><button type="button" onClick={() => managePrice(observation, "delete")}>Delete</button></span></div>) : <p>No prices recorded yet. Add the first supermarket price.</p>}</div>
+              <div className="product-prices">{product.priceObservations.length ? [...product.priceObservations].sort((a, b) => a.currency === b.currency ? Number(a.price) - Number(b.price) : a.currency.localeCompare(b.currency)).map((observation) => <div className="price-entry" key={observation.id}>
+                {editingEntity?.type === "price" && editingEntity.id === observation.id ? <form className="inline-edit-form price-inline-edit" onSubmit={saveInlineEdit}>
+                  <input aria-label="Price amount" type="number" min="0" max="99999999.99" step="0.01" value={editValues.price ?? ""} onChange={(event) => updateEditField("price", event.target.value)} required />
+                  <select aria-label="Currency" value={editValues.currency ?? "COP"} onChange={(event) => updateEditField("currency", event.target.value)}>{["COP","EUR","USD","GBP","CHF","CAD","AUD"].map((currency) => <option key={currency} value={currency}>{currency}</option>)}</select>
+                  <input aria-label="Observed date" type="datetime-local" value={editValues.observedAt ?? ""} onChange={(event) => updateEditField("observedAt", event.target.value)} required />
+                  <input aria-label="Price source" value={editValues.source ?? ""} onChange={(event) => updateEditField("source", event.target.value)} placeholder="Source / note (optional)" maxLength={100} />
+                  <button className="primary-action" type="submit" disabled={savingEdit}>{savingEdit ? "Saving…" : "Save"}</button><button className="secondary-action" type="button" onClick={cancelEdit}>Cancel</button>
+                </form> : <><span>{observation.supermarket.name}</span><strong>{Number(observation.price).toFixed(2)} {observation.currency}</strong><span className="price-management-actions"><button type="button" onClick={() => managePrice(observation, "edit")}>Edit</button><button type="button" onClick={() => managePrice(observation, "delete")}>Delete</button></span></>}
+              </div>) : <p>No prices recorded yet. Add the first supermarket price.</p>}</div>
               {priceProductId === product.id && <form className="record-price-form" onSubmit={savePrice}><strong>Record price at {product.name}</strong><select value={priceSupermarketId} onChange={(event) => setPriceSupermarketId(event.target.value)} required><option value="">Choose supermarket</option>{supermarkets.map((supermarket) => <option key={supermarket.id} value={supermarket.id}>{supermarket.name}{supermarket.chain ? ` · ${supermarket.chain}` : ""}</option>)}</select><div><input type="number" min="0" max="99999999.99" step="0.01" value={priceValue} onChange={(event) => setPriceValue(event.target.value)} placeholder="Price amount" required /><select aria-label="Price currency" value={priceCurrency} onChange={(event) => setPriceCurrency(event.target.value)}><option value="COP">COP $</option><option value="EUR">EUR €</option><option value="USD">USD $</option><option value="GBP">GBP £</option><option value="CHF">CHF</option><option value="CAD">CAD $</option><option value="AUD">AUD $</option></select><button className="primary-action" type="submit" disabled={savingPrice || !priceSupermarketId || priceValue === ""}>{savingPrice ? "Saving…" : "Save price"}</button></div></form>}
             </div>}
           </article>)}</div> : <div className="empty-dashboard"><div className="empty-illustration">⌕</div><h2>{catalogProducts.length ? "No products in this category" : "No products found"}</h2><p>{catalogProducts.length ? "Choose another category or select All categories." : "Add your first product using the form above, or try another search."}</p></div>}
