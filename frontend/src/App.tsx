@@ -165,7 +165,7 @@ function App() {
   const [priceProductId, setPriceProductId] = useState<string | null>(null);
   const [priceValue, setPriceValue] = useState("");
   const [priceSupermarketId, setPriceSupermarketId] = useState("");
-  const [priceCurrency, setPriceCurrency] = useState("EUR");
+  const [priceCurrency, setPriceCurrency] = useState("COP");
   const [savingPrice, setSavingPrice] = useState(false);
   const [newListName, setNewListName] = useState("");
   const [newItemName, setNewItemName] = useState("");
@@ -460,7 +460,7 @@ function App() {
         method: "POST",
         body: JSON.stringify({ supermarketId: priceSupermarketId, price: Number(priceValue), currency: priceCurrency, source: "manual-entry" })
       });
-      setPriceProductId(null); setPriceValue(""); setPriceCurrency("EUR");
+      setPriceProductId(null); setPriceValue(""); setPriceCurrency("COP");
       const data = await apiRequest<{ products: CatalogProduct[] }>(`/catalog/products?q=${encodeURIComponent(catalogQuery)}`, token);
       setCatalogProducts(data.products);
     } catch (requestError) {
