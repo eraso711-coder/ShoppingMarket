@@ -325,24 +325,38 @@ router.get("/products/:productId/prices", async (request, response, next) => {
 
 router.patch("/prices/:priceId", async (request, response, next) => {
   try {
-    const { price, currency, observedAt, source } = request.body ?? {};
+    const { price, currency, observedAt, source, supermarketId } = request.body ?? {};
     if (typeof price !== "number" || !Number.isFinite(price) || price < 0 || price > 99999999.99 ||
         typeof currency !== "string" || !/^[A-Za-z]{3}$/.test(currency) ||
         (observedAt !== undefined && (typeof observedAt !== "string" || Number.isNaN(new Date(observedAt).getTime()))) ||
-        (source !== undefined && source !== null && (typeof source !== "string" || source.trim().length > 100))) {
+        (source !== undefined && source !== null && (typeof source !== "string" || source.trim().length > 100)) ||
+        (supermarketId !== undefined && (typeof supermarketId !== "string" || !supermarketId))) {
       response.status(400).json({ error: "Provide a valid price, currency, observation date and source." }); return;
     }
-    const existing = await prisma.priceObservation.findUnique({ where: { id: request.params.priceId }, select: { id: true } });
+    const existing = await prisma.priceObservation.findUnique({ where: { id: request.params.priceId }, select: { id: true, productId: true, supermarketId: true } });
     if (!existing) { response.status(404).json({ error: "Price observation not found." }); return; }
-    const observation = await prisma.priceObservation.update({
-      where: { id: existing.id },
-      data: {
-        price: new Prisma.Decimal(price),
-        currency: currency.toUpperCase(),
-        ...(observedAt !== undefined ? { observedAt: new Date(observedAt) } : {}),
-        ...(source !== undefined ? { source: typeof source === "string" && source.trim() ? source.trim() : null } : {})
-      },
-      include: { supermarket: { select: { id: true, name: true, chain: true } } }
+    const nextSupermarketId = supermarketId ?? existing.supermarketId;
+    const supermarket = await prisma.supermarket.findUnique({ where: { id: nextSupermarketId }, select: { id: true } });
+    if (!supermarket) { response.status(404).json({ error: "Supermarket not found." }); return; }
+    const observation = await prisma.$transaction(async (transaction) => {
+      if (nextSupermarketId !== existing.supermarketId) {
+        await transaction.supermarketProduct.upsert({
+          where: { supermarketId_productId: { supermarketId: nextSupermarketId, productId: existing.productId } },
+          create: { supermarketId: nextSupermarketId, productId: existing.productId, isAvailable: true },
+          update: { isAvailable: true }
+        });
+      }
+      return transaction.priceObservation.update({
+        where: { id: existing.id },
+        data: {
+          price: new Prisma.Decimal(price),
+          currency: currency.toUpperCase(),
+          supermarketId: nextSupermarketId,
+          ...(observedAt !== undefined ? { observedAt: new Date(observedAt) } : {}),
+          ...(source !== undefined ? { source: typeof source === "string" && source.trim() ? source.trim() : null } : {})
+        },
+        include: { supermarket: { select: { id: true, name: true, chain: true } } }
+      });
     });
     response.json({ observation });
   } catch (error) { next(error); }
