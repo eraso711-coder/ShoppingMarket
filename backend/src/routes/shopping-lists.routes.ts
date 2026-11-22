@@ -155,6 +155,21 @@ router.patch("/:listId", async (request, response, next) => {
   }
 });
 
+router.delete("/:listId", async (request, response, next) => {
+  try {
+    const userId = currentUserId(response);
+    const list = await accessibleList(request.params.listId, userId);
+    if (!list) {
+      response.status(404).json({ error: "Shopping list not found." });
+      return;
+    }
+    await prisma.shoppingList.delete({ where: { id: list.id } });
+    response.status(204).end();
+  } catch (error) {
+    next(error);
+  }
+});
+
 router.post("/:listId/items", async (request, response, next) => {
   try {
     const userId = currentUserId(response);
