@@ -113,3 +113,6 @@ h1{max-width:570px;margin:20px 0 18px;font-family:Manrope,sans-serif;font-size:c
  .list-inline-edit .inline-edit-actions{grid-column:auto}
  .product-inline-edit{flex-basis:100%}
 }
+
+.item-secondary-fields>select{height:31px;max-width:125px;padding:0 7px;border:1px solid #e1e6dc;border-radius:7px;background:#fff;color:#687663;font-size:10px}
+@media(max-width:680px){.item-secondary-fields{flex-wrap:wrap}.item-secondary-fields>input{flex-basis:100%}.item-secondary-fields>select{flex:1;max-width:none}}
