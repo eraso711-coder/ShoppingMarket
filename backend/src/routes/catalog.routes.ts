@@ -306,16 +306,23 @@ router.get("/products/:productId/prices", async (request, response, next) => {
 
 router.patch("/prices/:priceId", async (request, response, next) => {
   try {
-    const { price, currency } = request.body ?? {};
+    const { price, currency, observedAt, source } = request.body ?? {};
     if (typeof price !== "number" || !Number.isFinite(price) || price < 0 || price > 99999999.99 ||
-        typeof currency !== "string" || !/^[A-Za-z]{3}$/.test(currency)) {
-      response.status(400).json({ error: "Provide a valid non-negative price and 3-letter currency code." }); return;
+        typeof currency !== "string" || !/^[A-Za-z]{3}$/.test(currency) ||
+        (observedAt !== undefined && (typeof observedAt !== "string" || Number.isNaN(new Date(observedAt).getTime()))) ||
+        (source !== undefined && source !== null && (typeof source !== "string" || source.trim().length > 100))) {
+      response.status(400).json({ error: "Provide a valid price, currency, observation date and source." }); return;
     }
     const existing = await prisma.priceObservation.findUnique({ where: { id: request.params.priceId }, select: { id: true } });
     if (!existing) { response.status(404).json({ error: "Price observation not found." }); return; }
     const observation = await prisma.priceObservation.update({
       where: { id: existing.id },
-      data: { price: new Prisma.Decimal(price), currency: currency.toUpperCase() },
+      data: {
+        price: new Prisma.Decimal(price),
+        currency: currency.toUpperCase(),
+        ...(observedAt !== undefined ? { observedAt: new Date(observedAt) } : {}),
+        ...(source !== undefined ? { source: typeof source === "string" && source.trim() ? source.trim() : null } : {})
+      },
       include: { supermarket: { select: { id: true, name: true, chain: true } } }
     });
     response.json({ observation });
