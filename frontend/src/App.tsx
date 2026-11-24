@@ -178,10 +178,11 @@ function App() {
   const [priceCurrency, setPriceCurrency] = useState("COP");
   const [savingPrice, setSavingPrice] = useState(false);
   const [newListName, setNewListName] = useState("");
+  const [newListDueAt, setNewListDueAt] = useState("");
   const [newItemName, setNewItemName] = useState("");
   const [newItemQuantity, setNewItemQuantity] = useState("1");
   const [newItemNotes, setNewItemNotes] = useState("");
-  const [filter, setFilter] = useState<"ALL" | "ACTIVE" | "COMPLETED">("ALL");
+  const [filter, setFilter] = useState<"ALL" | "ACTIVE" | "COMPLETED" | "ARCHIVED">("ALL");
   const [loading, setLoading] = useState(false);
   const [checkingSession, setCheckingSession] = useState(true);
   const [creatingList, setCreatingList] = useState(false);
@@ -260,9 +261,10 @@ function App() {
     try {
       const data = await apiRequest<{ list: ShoppingList }>("/shopping-lists", token, {
         method: "POST",
-        body: JSON.stringify({ name: newListName, familyId: profile.family.id })
+        body: JSON.stringify({ name: newListName, familyId: profile.family.id, dueAt: newListDueAt ? new Date(newListDueAt).toISOString() : null })
       });
       setNewListName("");
+      setNewListDueAt("");
       await refreshLists(token);
       setSelectedListId(data.list.id);
     } catch (requestError) {
@@ -310,7 +312,7 @@ function App() {
     }
   }
 
-  async function updateListStatus(status: "ACTIVE" | "COMPLETED") {
+  async function updateListStatus(status: "ACTIVE" | "COMPLETED" | "ARCHIVED") {
     if (!token || !selectedList) return;
     setError("");
     try {
@@ -532,7 +534,7 @@ function App() {
           <aside className="lists-panel">
             <div className="panel-heading"><div><span className="preview-kicker">HOUSEHOLD</span><h2>Shopping lists</h2></div><span className="list-count">{lists.length}</span></div>
             <div className="list-filters">
-              {(["ALL", "ACTIVE", "COMPLETED"] as const).map((value) => <button key={value} className={filter === value ? "selected" : ""} onClick={() => setFilter(value)}>{value === "ALL" ? "All" : value === "ACTIVE" ? "Active" : "Completed"}</button>)}
+              {(["ALL", "ACTIVE", "COMPLETED", "ARCHIVED"] as const).map((value) => <button key={value} className={filter === value ? "selected" : ""} onClick={() => setFilter(value)}>{value === "ALL" ? "All" : value === "ACTIVE" ? "Active" : value === "COMPLETED" ? "Completed" : "Archived"}</button>)}
             </div>
             <div className="list-stack">
               {visibleLists.map((list) => {
@@ -547,6 +549,8 @@ function App() {
             <form className="create-list-form" onSubmit={createList}>
               <label htmlFor="new-list-name">Create a list</label>
               <div><input id="new-list-name" value={newListName} onChange={(event) => setNewListName(event.target.value)} placeholder="e.g. Weekly groceries" maxLength={100} required /><button type="submit" disabled={creatingList || !newListName.trim()} aria-label="Create shopping list">+</button></div>
+              <label htmlFor="new-list-due-at">Due date (optional)</label>
+              <input id="new-list-due-at" type="datetime-local" value={newListDueAt} onChange={(event) => setNewListDueAt(event.target.value)} />
             </form>
           </aside>
           <section className="list-detail-panel">
@@ -561,7 +565,10 @@ function App() {
                 <div className="list-management-actions">
                   {!(editingEntity?.type === "list" && editingEntity.id === selectedList.id) && <button className="secondary-action" type="button" onClick={editSelectedList}>Edit list</button>}
                   <button className="secondary-action" type="button" onClick={deleteSelectedList}>Delete list</button>
-                  {selectedList.status !== "ARCHIVED" && <button className={selectedList.status === "COMPLETED" ? "secondary-action" : "primary-action"} onClick={() => updateListStatus(selectedList.status === "COMPLETED" ? "ACTIVE" : "COMPLETED")}>{selectedList.status === "COMPLETED" ? "Reopen list" : "Complete list"}</button>}
+                  {selectedList.status !== "ARCHIVED" ? <>
+                    <button className={selectedList.status === "COMPLETED" ? "secondary-action" : "primary-action"} onClick={() => updateListStatus(selectedList.status === "COMPLETED" ? "ACTIVE" : "COMPLETED")}>{selectedList.status === "COMPLETED" ? "Reopen list" : "Complete list"}</button>
+                    <button className="secondary-action" onClick={() => updateListStatus("ARCHIVED")}>Archive list</button>
+                  </> : <button className="primary-action" onClick={() => updateListStatus("ACTIVE")}>Restore list</button>}
                 </div>
               </div>
               <div className="progress-track"><span style={{ width: `${selectedList.items.length ? selectedList.items.filter((item) => item.status === "PURCHASED").length / selectedList.items.length * 100 : 0}%` }} /></div>
