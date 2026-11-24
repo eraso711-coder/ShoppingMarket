@@ -47,6 +47,13 @@ router.post("/categories", async (request, response, next) => {
       response.status(400).json({ error: "Invalid parent category." });
       return;
     }
+    if (typeof parentId === "string" && parentId) {
+      const parent = await prisma.category.findUnique({ where: { id: parentId }, select: { id: true } });
+      if (!parent) {
+        response.status(404).json({ error: "Parent category not found." });
+        return;
+      }
+    }
     const category = await prisma.category.create({
       data: { name: name.trim(), parentId: parentId || null }
     });
@@ -55,6 +62,44 @@ router.post("/categories", async (request, response, next) => {
     if (handleUniqueError(error, response)) return;
     next(error);
   }
+});
+
+
+router.patch("/categories/:categoryId", async (request, response, next) => {
+  try {
+    const { name, parentId } = request.body ?? {};
+    if (!textField(name, 80) || (parentId !== undefined && parentId !== null && typeof parentId !== "string")) {
+      response.status(400).json({ error: "Provide a valid category name and optional parent category." }); return;
+    }
+    const categoryId = request.params.categoryId;
+    const existing = await prisma.category.findUnique({ where: { id: categoryId }, select: { id: true } });
+    if (!existing) { response.status(404).json({ error: "Category not found." }); return; }
+    if (parentId !== undefined && parentId !== null) {
+      if (parentId === categoryId) { response.status(400).json({ error: "A category cannot be its own parent." }); return; }
+      const allCategories = await prisma.category.findMany({ select: { id: true, parentId: true } });
+      const parents = new Map(allCategories.map((entry) => [entry.id, entry.parentId]));
+      let ancestor: string | null = parentId;
+      while (ancestor) {
+        if (ancestor === categoryId) { response.status(400).json({ error: "This parent would create a category cycle." }); return; }
+        ancestor = parents.get(ancestor) ?? null;
+      }
+      if (!parents.has(parentId)) { response.status(404).json({ error: "Parent category not found." }); return; }
+    }
+    const category = await prisma.category.update({
+      where: { id: categoryId },
+      data: { name: name.trim(), ...(parentId !== undefined ? { parentId } : {}) }
+    });
+    response.json({ category });
+  } catch (error) { if (handleUniqueError(error, response)) return; next(error); }
+});
+router.delete("/categories/:categoryId", async (request, response, next) => {
+  try {
+    const category = await prisma.category.findUnique({ where: { id: request.params.categoryId }, include: { _count: { select: { products: true, children: true } } } });
+    if (!category) { response.status(404).json({ error: "Category not found." }); return; }
+    if (category._count.products || category._count.children) { response.status(409).json({ error: "This category is in use. Move its products and child categories before deleting it." }); return; }
+    await prisma.category.delete({ where: { id: category.id } });
+    response.status(204).end();
+  } catch (error) { next(error); }
 });
 
 // Supermarket directory
@@ -100,6 +145,26 @@ router.post("/supermarkets", async (request, response, next) => {
   }
 });
 
+
+router.patch("/supermarkets/:supermarketId", async (request, response, next) => {
+  try {
+    const { name, chain, website } = request.body ?? {};
+    if (!textField(name, 100) || (chain !== undefined && chain !== null && (typeof chain !== "string" || chain.trim().length > 100)) || (website !== undefined && website !== null && (typeof website !== "string" || website.trim().length > 300))) { response.status(400).json({ error: "Provide a valid name, chain and website." }); return; }
+    if (website && !/^https?:\/\//i.test(website)) { response.status(400).json({ error: "Website must start with http:// or https://." }); return; }
+    const supermarket = await prisma.supermarket.update({ where: { id: request.params.supermarketId }, data: { name: name.trim(), chain: typeof chain === "string" && chain.trim() ? chain.trim() : null, website: typeof website === "string" && website.trim() ? website.trim() : null } });
+    response.json({ supermarket });
+  } catch (error) { if (handleUniqueError(error, response)) return; next(error); }
+});
+router.delete("/supermarkets/:supermarketId", async (request, response, next) => {
+  try {
+    const supermarket = await prisma.supermarket.findUnique({ where: { id: request.params.supermarketId }, include: { _count: { select: { prices: true } } } });
+    if (!supermarket) { response.status(404).json({ error: "Supermarket not found." }); return; }
+    if (supermarket._count.prices) { response.status(409).json({ error: "This supermarket has price history and cannot be deleted without losing historical records." }); return; }
+    await prisma.supermarket.delete({ where: { id: supermarket.id } });
+    response.status(204).end();
+  } catch (error) { next(error); }
+});
+
 // Product catalogue
 router.get("/products", async (request, response, next) => {
   try {
@@ -132,8 +197,9 @@ router.get("/products", async (request, response, next) => {
     }) : [];
     const seen = new Set<string>();
     const latestPrices = observations.filter((observation) => {
-      if (seen.has(observation.supermarketId + ":" + observation.productId)) return false;
-      seen.add(observation.supermarketId + ":" + observation.productId);
+      const key = observation.supermarketId + ":" + observation.productId;
+      if (seen.has(key)) return false;
+      seen.add(key);
       return true;
     });
     response.json({
@@ -151,13 +217,13 @@ router.post("/products", async (request, response, next) => {
   try {
     userId(response);
     const { name, brand, barcode, description, categoryId, unit, quantity } = request.body ?? {};
-    if (!textField(name, 150) ||
+    if (!textField(name, 150) || !textField(categoryId, 64) ||
         (brand !== undefined && brand !== null && (typeof brand !== "string" || brand.trim().length > 100)) ||
         (barcode !== undefined && barcode !== null && (typeof barcode !== "string" || barcode.trim().length > 64)) ||
         (description !== undefined && description !== null && (typeof description !== "string" || description.length > 1000)) ||
         (categoryId !== undefined && categoryId !== null && typeof categoryId !== "string") ||
         (unit !== undefined && unit !== null && (typeof unit !== "string" || unit.trim().length > 30))) {
-      response.status(400).json({ error: "Check the product name and optional product details." });
+      response.status(400).json({ error: "A product name and category are required. Check the other optional product details too." });
       return;
     }
     let parsedQuantity: Prisma.Decimal | null = null;
@@ -170,13 +236,20 @@ router.post("/products", async (request, response, next) => {
       }
       parsedQuantity = new Prisma.Decimal(numericQuantity);
     }
+    {
+      const category = await prisma.category.findUnique({ where: { id: categoryId }, select: { id: true } });
+      if (!category) {
+        response.status(404).json({ error: "Category not found." });
+        return;
+      }
+    }
     const product = await prisma.product.create({
       data: {
         name: name.trim(),
         brand: typeof brand === "string" && brand.trim() ? brand.trim() : null,
         barcode: typeof barcode === "string" && barcode.trim() ? barcode.trim() : null,
         description: typeof description === "string" && description.trim() ? description.trim() : null,
-        categoryId: typeof categoryId === "string" && categoryId ? categoryId : null,
+        categoryId,
         unit: typeof unit === "string" && unit.trim() ? unit.trim() : null,
         quantity: parsedQuantity
       },
@@ -187,6 +260,37 @@ router.post("/products", async (request, response, next) => {
     if (handleUniqueError(error, response)) return;
     next(error);
   }
+});
+
+
+router.patch("/products/:productId", async (request, response, next) => {
+  try {
+    const { name, brand, barcode, description, categoryId, unit, quantity } = request.body ?? {};
+    if (!textField(name, 150) || !textField(categoryId, 64) ||
+      (brand !== undefined && brand !== null && (typeof brand !== "string" || brand.trim().length > 100)) ||
+      (barcode !== undefined && barcode !== null && (typeof barcode !== "string" || barcode.trim().length > 64)) ||
+      (description !== undefined && description !== null && (typeof description !== "string" || description.length > 1000)) ||
+      (unit !== undefined && unit !== null && (typeof unit !== "string" || unit.trim().length > 30))) { response.status(400).json({ error: "Provide a product name and valid category and optional details." }); return; }
+    const category = await prisma.category.findUnique({ where: { id: categoryId }, select: { id: true } });
+    if (!category) { response.status(404).json({ error: "Category not found." }); return; }
+    let parsedQuantity: Prisma.Decimal | null = null;
+    if (quantity !== undefined && quantity !== null && quantity !== "") {
+      const n = Number(quantity);
+      if (!Number.isFinite(n) || n <= 0 || n > 9999999.999 || !Number.isInteger(n * 1000)) { response.status(400).json({ error: "Quantity must be positive with up to 3 decimal places." }); return; }
+      parsedQuantity = new Prisma.Decimal(n);
+    }
+    const product = await prisma.product.update({ where: { id: request.params.productId }, data: { name: name.trim(), brand: typeof brand === "string" && brand.trim() ? brand.trim() : null, barcode: typeof barcode === "string" && barcode.trim() ? barcode.trim() : null, description: typeof description === "string" && description.trim() ? description.trim() : null, categoryId, unit: typeof unit === "string" && unit.trim() ? unit.trim() : null, quantity: parsedQuantity }, include: { category: { select: { id: true, name: true } } } });
+    response.json({ product });
+  } catch (error) { if (handleUniqueError(error, response)) return; next(error); }
+});
+router.delete("/products/:productId", async (request, response, next) => {
+  try {
+    const product = await prisma.product.findUnique({ where: { id: request.params.productId }, include: { _count: { select: { priceObservations: true, listItems: true } } } });
+    if (!product) { response.status(404).json({ error: "Product not found." }); return; }
+    if (product._count.priceObservations || product._count.listItems) { response.status(409).json({ error: "This product is referenced by shopping lists or price history. Remove those records before deleting it." }); return; }
+    await prisma.product.delete({ where: { id: product.id } });
+    response.status(204).end();
+  } catch (error) { next(error); }
 });
 
 // Latest recorded prices for a product, grouped by supermarket in the response.
@@ -218,11 +322,60 @@ router.get("/products/:productId/prices", async (request, response, next) => {
   }
 });
 
+
+router.patch("/prices/:priceId", async (request, response, next) => {
+  try {
+    const { price, currency, observedAt, source, supermarketId } = request.body ?? {};
+    if (typeof price !== "number" || !Number.isFinite(price) || price < 0 || price > 99999999.99 ||
+        typeof currency !== "string" || !/^[A-Za-z]{3}$/.test(currency) ||
+        (observedAt !== undefined && (typeof observedAt !== "string" || Number.isNaN(new Date(observedAt).getTime()))) ||
+        (source !== undefined && source !== null && (typeof source !== "string" || source.trim().length > 100)) ||
+        (supermarketId !== undefined && (typeof supermarketId !== "string" || !supermarketId))) {
+      response.status(400).json({ error: "Provide a valid price, currency, observation date and source." }); return;
+    }
+    const existing = await prisma.priceObservation.findUnique({ where: { id: request.params.priceId }, select: { id: true, productId: true, supermarketId: true } });
+    if (!existing) { response.status(404).json({ error: "Price observation not found." }); return; }
+    const nextSupermarketId = supermarketId ?? existing.supermarketId;
+    const supermarket = await prisma.supermarket.findUnique({ where: { id: nextSupermarketId }, select: { id: true } });
+    if (!supermarket) { response.status(404).json({ error: "Supermarket not found." }); return; }
+    const observation = await prisma.$transaction(async (transaction) => {
+      if (nextSupermarketId !== existing.supermarketId) {
+        await transaction.supermarketProduct.upsert({
+          where: { supermarketId_productId: { supermarketId: nextSupermarketId, productId: existing.productId } },
+          create: { supermarketId: nextSupermarketId, productId: existing.productId, isAvailable: true },
+          update: { isAvailable: true }
+        });
+      }
+      return transaction.priceObservation.update({
+        where: { id: existing.id },
+        data: {
+          price: new Prisma.Decimal(price),
+          currency: currency.toUpperCase(),
+          supermarketId: nextSupermarketId,
+          ...(observedAt !== undefined ? { observedAt: new Date(observedAt) } : {}),
+          ...(source !== undefined ? { source: typeof source === "string" && source.trim() ? source.trim() : null } : {})
+        },
+        include: { supermarket: { select: { id: true, name: true, chain: true } } }
+      });
+    });
+    response.json({ observation });
+  } catch (error) { next(error); }
+});
+
+router.delete("/prices/:priceId", async (request, response, next) => {
+  try {
+    const existing = await prisma.priceObservation.findUnique({ where: { id: request.params.priceId }, select: { id: true } });
+    if (!existing) { response.status(404).json({ error: "Price observation not found." }); return; }
+    await prisma.priceObservation.delete({ where: { id: existing.id } });
+    response.status(204).end();
+  } catch (error) { next(error); }
+});
+
 // Record a manual or imported price observation and keep the supermarket offer in sync.
 router.post("/products/:productId/prices", async (request, response, next) => {
   try {
     const recordedBy = userId(response);
-    const { supermarketId, price, currency = "EUR", source } = request.body ?? {};
+    const { supermarketId, price, currency = "COP", source } = request.body ?? {};
     if (typeof supermarketId !== "string" || typeof price !== "number" ||
         !Number.isFinite(price) || price < 0 || price > 99999999.99 ||
         !/^[A-Za-z]{3}$/.test(currency) ||

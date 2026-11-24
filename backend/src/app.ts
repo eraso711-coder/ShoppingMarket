@@ -1,0 +1,17 @@
+import cors from "cors";
+import express from "express";
+import healthRoutes from "./routes/health.routes.js";
+import authRoutes from "./routes/auth.routes.js";
+import shoppingListsRoutes from "./routes/shopping-lists.routes.js";
+import catalogRoutes from "./routes/catalog.routes.js";
+import { errorHandler } from "./middleware/error.middleware.js";
+const app=express();
+app.use(cors({origin:process.env.FRONTEND_URL??"http://localhost:5175"}));
+app.use(express.json());
+app.get("/",(_request,response)=>response.json({name:"ShoppingMarket API",status:"running"}));
+app.use("/api/health",healthRoutes);
+app.use("/api/auth",authRoutes);
+app.use("/api/shopping-lists",shoppingListsRoutes);
+app.use("/api/catalog",catalogRoutes);
+app.use(errorHandler);
+export default app;
