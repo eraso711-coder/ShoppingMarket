@@ -496,10 +496,10 @@ function App() {
   }
 
   async function addCatalogueProductToList(product: CatalogProduct) {
-    if (!token || !selectedListId) return;
+    if (!token || !catalogTargetListId) return;
     setCatalogError("");
     try {
-      await apiRequest(`/shopping-lists/${selectedListId}/items`, token, {
+      await apiRequest(`/shopping-lists/${catalogTargetListId}/items`, token, {
         method: "POST",
         body: JSON.stringify({ productId: product.id, quantity: 1 })
       });
@@ -510,6 +510,10 @@ function App() {
   }
 
   const visibleLists = lists.filter((list) => filter === "ALL" || list.status === filter);
+  const activeLists = lists.filter((list) => list.status === "ACTIVE");
+  const catalogTargetListId = activeLists.some((list) => list.id === selectedListId)
+    ? selectedListId ?? ""
+    : activeLists[0]?.id ?? "";
   const selectedList = lists.find((list) => list.id === selectedListId) ?? null;
   const visibleCatalogProducts = catalogProducts.filter((product) => categoryFilter === "ALL" || product.category?.id === categoryFilter);
 
@@ -629,11 +633,13 @@ function App() {
           </div>
           <div className="catalog-results-toolbar">
             <div className="catalog-results-heading"><h3>Products</h3><span>{visibleCatalogProducts.length} shown · {catalogProducts.length} total</span></div>
+            <label className="category-filter"><span>Add products to</span><select value={catalogTargetListId} onChange={(event) => setSelectedListId(event.target.value)} disabled={activeLists.length === 0}><option value="">Choose an active list</option>{activeLists.map((list) => <option key={list.id} value={list.id}>{list.name}</option>)}</select></label>
             <label className="category-filter"><span>Filter by category</span><select value={categoryFilter} onChange={(event) => { setCategoryFilter(event.target.value); setExpandedPriceProductId(null); }}><option value="ALL">All categories</option>{catalogCategories.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}</select></label>
           </div>
+          {activeLists.length === 0 && <p className="catalog-form-hint">Create or restore an active shopping list before adding catalogue products.</p>}
           {catalogLoading ? <div className="empty-dashboard">Loading catalogue…</div> : visibleCatalogProducts.length ? <div className="product-directory">{visibleCatalogProducts.map((product) => <article className={expandedPriceProductId === product.id ? "product-row expanded" : "product-row"} key={product.id}>
             <div className="product-row-main">
-              <div className="product-row-identity"><span className="product-category">{product.category?.name??"Uncategorised"}</span><h3>{product.name}</h3><p>{product.brand??"No brand"}{product.unit?` · ${product.unit}`:""}{product.quantity?` · ${product.quantity} ${product.unit??"units"}`:""}</p></div><div className="product-row-summary"><span>{product.priceObservations.length} {product.priceObservations.length===1?"supermarket price":"supermarket prices"}</span><strong>{product.priceObservations.length?`${product.priceObservations.length} recorded`:"No prices yet"}</strong></div><div className="product-row-actions"><button className="primary-action" type="button" onClick={()=>setExpandedPriceProductId(expandedPriceProductId===product.id?null:product.id)}>{expandedPriceProductId===product.id?"Hide prices":"Manage prices"}</button><button className="secondary-action" type="button" onClick={()=>manageProduct(product,"edit")}>Edit</button><button className="secondary-action" type="button" onClick={()=>manageProduct(product,"delete")}>Delete</button>{selectedListId&&<button className="secondary-action" type="button" onClick={()=>addCatalogueProductToList(product)}>Add to list</button>}</div>
+              <div className="product-row-identity"><span className="product-category">{product.category?.name??"Uncategorised"}</span><h3>{product.name}</h3><p>{product.brand??"No brand"}{product.unit?` · ${product.unit}`:""}{product.quantity?` · ${product.quantity} ${product.unit??"units"}`:""}</p></div><div className="product-row-summary"><span>{product.priceObservations.length} {product.priceObservations.length===1?"supermarket price":"supermarket prices"}</span><strong>{product.priceObservations.length?`${product.priceObservations.length} recorded`:"No prices yet"}</strong></div><div className="product-row-actions"><button className="primary-action" type="button" onClick={()=>setExpandedPriceProductId(expandedPriceProductId===product.id?null:product.id)}>{expandedPriceProductId===product.id?"Hide prices":"Manage prices"}</button><button className="secondary-action" type="button" onClick={()=>manageProduct(product,"edit")}>Edit</button><button className="secondary-action" type="button" onClick={()=>manageProduct(product,"delete")}>Delete</button>{catalogTargetListId&&<button className="secondary-action" type="button" onClick={()=>addCatalogueProductToList(product)}>Add to list</button>}</div>
             </div>
             {expandedPriceProductId === product.id && <div className="product-price-management">
               <div className="product-price-heading"><div><strong>Supermarket prices</strong><span>Latest recorded price at each supermarket</span></div><button className="secondary-action" type="button" onClick={() => { clearCatalogueFormValues(); setEditingEntity(null); setPriceProductId(product.id); setPriceSupermarketId(supermarkets[0]?.id ?? ""); }}>＋ Record a price</button></div>
