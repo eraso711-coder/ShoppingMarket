@@ -116,3 +116,72 @@ h1{max-width:570px;margin:20px 0 18px;font-family:Manrope,sans-serif;font-size:c
 
 .item-secondary-fields>select{height:31px;max-width:125px;padding:0 7px;border:1px solid #e1e6dc;border-radius:7px;background:#fff;color:#687663;font-size:10px}
 @media(max-width:680px){.item-secondary-fields{flex-wrap:wrap}.item-secondary-fields>input{flex-basis:100%}.item-secondary-fields>select{flex:1;max-width:none}}
+
+
+/* Catalogue UI consistency and compact layouts */
+.primary-action,.secondary-action{
+ display:inline-flex;align-items:center;justify-content:center;
+ min-height:32px;height:32px;padding:0 11px;border-radius:7px;
+ font-size:10px;line-height:1;font-weight:700;white-space:nowrap
+}
+.primary-action{border:1px solid #315b3b;background:#315b3b;color:#fff}
+.primary-action:hover{background:#25492e}
+.secondary-action{border:1px solid #dfe5da;background:#fff;color:#536b54}
+.secondary-action:hover{border-color:#b9cbb5;background:#f7faf5}
+.compact-action{min-height:29px;height:29px;padding:0 9px;font-size:9px}
+.category-create-form input,.catalog-create-form input,.catalog-create-form select,
+.catalog-create-form textarea,.supermarket-create-fields input,.record-price-form input,
+.record-price-form select,.category-filter select,.catalog-search input{
+ min-height:38px;height:38px;padding:0 11px;border:1px solid #e1e6dc;
+ border-radius:8px;background:#fff;color:#354232;font:inherit;font-size:11px;outline:none
+}
+.catalog-create-form textarea{
+ width:100%;min-height:40px;height:auto;padding:9px 11px;resize:vertical;line-height:1.45
+}
+.category-create-form input{height:38px}
+.category-create-form .primary-action{height:32px;min-height:32px}
+.supermarket-create-fields{display:grid;gap:9px}
+.supermarket-create-fields .catalog-form-row{gap:9px}
+.supermarket-create-fields .catalog-form-row>*{min-width:0}
+.supermarket-create-fields>button{justify-self:start}
+.category-edit-card>button,.directory-list button,.price-management-actions button{
+ display:inline-flex;align-items:center;justify-content:center;min-height:29px;height:29px;
+ padding:0 9px;border:1px solid #dfe5da;border-radius:7px;background:#fff;color:#536b54;
+ font-size:9px;line-height:1;font-weight:700
+}
+.category-edit-card>button:hover,.directory-list button:hover,.price-management-actions button:hover{
+ border-color:#b9cbb5;background:#f7faf5
+}
+.record-price-form{gap:8px}
+.record-price-fields{
+ display:grid;grid-template-columns:minmax(150px,1.2fr) minmax(100px,1fr) minmax(95px,.7fr) auto auto;
+ align-items:center;gap:8px
+}
+.record-price-fields>*{min-width:0;width:100%}
+.record-price-fields .primary-action,.record-price-fields .secondary-action{width:auto;padding-inline:11px}
+.product-directory{grid-template-columns:repeat(2,minmax(0,1fr));align-items:start;gap:12px}
+.product-row{min-width:0}
+.product-row-main{
+ display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:10px;padding:13px
+}
+.product-row-identity{min-width:0}
+.product-row-summary{grid-column:1;grid-row:2;min-width:0;display:flex;align-items:center;gap:7px}
+.product-row-actions{grid-column:2;grid-row:1 / span 2;justify-content:flex-end;max-width:150px}
+.product-row-actions button{height:29px;min-height:29px;padding:0 8px}
+.product-row-actions .primary-action{white-space:normal;text-align:center}
+.product-price-management{padding:11px 13px}
+.product-price-heading button{height:29px;min-height:29px}
+.product-prices>div{gap:7px}
+@media(max-width:900px){
+ .record-price-fields{grid-template-columns:minmax(120px,1.2fr) minmax(90px,1fr) minmax(85px,.7fr) auto auto}
+ .product-row-main{grid-template-columns:minmax(0,1fr)}
+ .product-row-summary,.product-row-actions{grid-column:1;grid-row:auto}
+ .product-row-actions{max-width:none;justify-content:flex-start}
+}
+@media(max-width:680px){
+ .product-directory{grid-template-columns:1fr}
+ .record-price-fields{grid-template-columns:1fr 1fr}
+ .record-price-fields select:first-child{grid-column:1/-1}
+ .record-price-fields .primary-action,.record-price-fields .secondary-action{width:100%}
+ .supermarket-create-fields .catalog-form-row{flex-direction:column}
+}
